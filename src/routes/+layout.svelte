@@ -1,8 +1,8 @@
 <script lang="ts">
+	import '../app.css';
 	import Logo from '$lib/assets/icons/Logo.svelte';
 	import Search from '$lib/assets/icons/Search.svelte';
 	import TextInput from '$lib/components/TextInput.svelte';
-	import '../app.css';
 	let { children } = $props();
 </script>
 
