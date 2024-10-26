@@ -1,7 +1,7 @@
 <script module>
 	import { defineMeta } from '@storybook/addon-svelte-csf';
-	import TextInput from './TextInput.svelte';
 	import Search from '$lib/assets/icons/Search.svelte';
+	import TextInput from './TextInput.svelte';
 
 	// More on how to set up stories at: https://storybook.js.org/docs/writing-stories
 	const { Story } = defineMeta({

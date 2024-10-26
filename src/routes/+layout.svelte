@@ -2,7 +2,7 @@
 	import '../app.css';
 	import Logo from '$lib/assets/icons/Logo.svelte';
 	import Search from '$lib/assets/icons/Search.svelte';
-	import TextInput from '$lib/components/TextInput.svelte';
+	import TextInput from '$lib/components/TextInput/TextInput.svelte';
 	let { children } = $props();
 </script>
 
