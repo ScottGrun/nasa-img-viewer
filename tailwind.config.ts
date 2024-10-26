@@ -5,9 +5,12 @@ import type { Config } from 'tailwindcss';
 
 export default {
 	content: ['./src/**/*.{html,js,svelte,ts}'],
-
 	theme: {
-		extend: {}
+		extend: {
+			fontFamily: {
+				sans: ['Noto Sans Variable']
+			}
+		}
 	},
 
 	plugins: [typography, forms, aspectRatio]
