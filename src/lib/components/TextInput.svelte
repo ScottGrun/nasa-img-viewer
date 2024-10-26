@@ -10,7 +10,7 @@
 	let { icon, ...rest }: Props = $props();
 </script>
 
-<div class={twMerge('relative', rest.class)}>
+<div class={twMerge('relative w-full', rest.class)}>
 	<input
 		type="text"
 		placeholder="Search image Eg. Landscape"
