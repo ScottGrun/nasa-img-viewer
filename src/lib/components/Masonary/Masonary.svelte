@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { twMerge } from 'tailwind-merge';
+
 	type MasonaryImage = {
 		url: string;
 		description: string;
@@ -6,12 +8,13 @@
 
 	interface Props {
 		images: MasonaryImage[];
+		class?: string;
 	}
 
-	const { images }: Props = $props();
+	const { images, class: className }: Props = $props();
 </script>
 
-<div class="columns-2 gap-2 lg:columns-3">
+<div class={twMerge('columns-2 gap-2 lg:columns-3', className)}>
 	{#each images as image}
 		<img
 			src={image.url}
