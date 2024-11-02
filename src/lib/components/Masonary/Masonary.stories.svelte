@@ -17,7 +17,6 @@
 				description: `Alt text for example image ${idx}`,
 
 				title: `Test Image ${idx}`,
-
 				nasaId: String(idx)
 			}))
 		}

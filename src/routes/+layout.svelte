@@ -10,7 +10,7 @@
 	<Search />
 {/snippet}
 
-<div class="px-4">
+<div class="mx-auto max-w-[1440px] px-4">
 	<header class="py-7">
 		<nav class="gap flex w-full items-center gap-4">
 			<a href="/" class=" p-1.5">

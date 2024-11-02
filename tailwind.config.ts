@@ -9,6 +9,10 @@ export default {
 		extend: {
 			fontFamily: {
 				sans: ['Noto Sans Variable']
+			},
+			backgroundImage: {
+				'masonary-image-gradient':
+					'linear-gradient(0deg, hsla(0, 0%, 0%, 0.804) 0%, hsla(0, 0%, 100%, 0) 100%)'
 			}
 		}
 	},
