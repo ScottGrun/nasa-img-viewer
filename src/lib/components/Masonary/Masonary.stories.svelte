@@ -14,7 +14,11 @@
 					idx % 2 == 0
 						? 'https://picsum.photos/seed/picsumm/500/300'
 						: 'https://picsum.photos/seed/picsumm/600/400',
-				description: `Alt text for example image ${idx}`
+				description: `Alt text for example image ${idx}`,
+
+				title: `Test Image ${idx}`,
+
+				nasaId: String(idx)
 			}))
 		}
 	});
