@@ -9,8 +9,6 @@
 
 	const { class: className, images, aspectRatio = 16 / 9, ...rest }: Props = $props();
 
-	console.log({ aspectRatio });
-
 	let naturalAspectRatio = $state(aspectRatio);
 	let imageElement: HTMLImageElement | undefined = $state(undefined);
 	let imageLoaded = $state(false);
@@ -45,10 +43,6 @@
 	style={`aspect-ratio:${naturalAspectRatio}`}
 	class={twMerge('relative overflow-hidden bg-neutral-50', className)}
 >
-	{#if !imageLoaded}
-		<div class="h-full w-full animate-pulse bg-neutral-300"></div>
-	{/if}
-
 	{#if images && images.length > 0}
 		<picture>
 			<!-- Large screens -->
@@ -73,7 +67,7 @@
 					onload={onLoad}
 					{...rest}
 					class={twMerge(
-						'absolute left-0 top-0 h-full w-full object-cover opacity-0 transition-all',
+						'duration-600 absolute left-0 top-0 h-full w-full object-cover opacity-0 transition-all ease-in',
 						imageLoaded && 'relative opacity-100',
 						className
 					)}
@@ -86,7 +80,7 @@
 			onload={onLoad}
 			{...rest}
 			class={twMerge(
-				'absolute left-0 top-0 h-full w-full object-cover opacity-0 transition-all',
+				'absolute left-0 top-0 h-full w-full object-cover opacity-0 transition-all duration-300 ease-in',
 				imageLoaded && 'relative opacity-100',
 				className
 			)}
