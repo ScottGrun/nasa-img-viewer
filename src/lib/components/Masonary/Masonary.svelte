@@ -10,8 +10,8 @@
 	const { images, class: className }: Props = $props();
 </script>
 
-<div class={twMerge('columns-2 gap-2 lg:columns-3', className)}>
+<div class={twMerge('columns-1 gap-2 md:columns-2 lg:columns-3', className)}>
 	{#each images as image}
-		<MasonaryImage {...image} class="mb-2 w-full rounded-xl" />
+		<MasonaryImage {...image} class="mb-2 w-full " />
 	{/each}
 </div>
