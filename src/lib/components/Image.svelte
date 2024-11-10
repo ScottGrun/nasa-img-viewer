@@ -8,7 +8,6 @@
 	}
 
 	const { class: className, images, aspectRatio = 16 / 9, ...rest }: Props = $props();
-
 	let naturalAspectRatio = $state(aspectRatio);
 	let imageElement: HTMLImageElement | undefined = $state(undefined);
 	let imageLoaded = $state(false);
