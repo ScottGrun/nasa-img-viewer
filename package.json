@@ -55,5 +55,8 @@
 	"dependencies": {
 		"@fontsource-variable/inter": "^5.1.0",
 		"tailwind-merge": "^2.5.4"
+	},
+	"engines": {
+		"node": ">=21.1.0"
 	}
 }

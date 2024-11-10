@@ -32,7 +32,6 @@
 
 	const photographer = data.metadata['AVAIL:Photographer'];
 	const location = data.metadata['AVAIL:Location'];
-	console.log(data.metadata);
 </script>
 
 {#snippet imageInfo(name: string, value?: string, link?: string)}
