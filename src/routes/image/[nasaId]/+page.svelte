@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Image from '$lib/components/Image.svelte';
 	import ImageTag from '$lib/components/ImageTag.svelte';
+	import { twMerge } from 'tailwind-merge';
 	import type { PageData } from './$types';
 	import RelatedImageGallery from './RelatedImageGallery.svelte';
 
@@ -22,11 +23,32 @@
 	const keywords = (data.metadata['AVAIL:Keywords'] ?? []).map((keyword) =>
 		stripUnsafeUrlChars(keyword)
 	);
-	const aspectRatio =
-		Number(data.metadata['EXIF:ImageWidth'] ?? 16) / Number(data.metadata['EXIF:ImageHeight'] ?? 9);
+	const width = Number(data.metadata['EXIF:ImageWidth'] ?? data.metadata['File:ImageWidth'] ?? 16);
+	const height = Number(
+		data.metadata['EXIF:ImageHeight'] ?? data.metadata['File:ImageHeight'] ?? 9
+	);
+	const aspectRatio = width / height;
+	const isPortrait = width < height;
+
+	const photographer = data.metadata['AVAIL:Photographer'];
+	const location = data.metadata['AVAIL:Location'];
+	console.log(data.metadata);
 </script>
 
-<main class="relative">
+{#snippet imageInfo(name: string, value?: string, link?: string)}
+	{#if Boolean(value)}
+		<div>
+			<span class="block text-xs text-neutral-600">{name}</span>
+			{#if link}
+				<a href={link} class="mt-2 block text-sm font-semibold text-neutral-900">{value}</a>
+			{:else}
+				<span class="mt-2 block text-sm font-semibold text-neutral-900">{value}</span>
+			{/if}
+		</div>
+	{/if}
+{/snippet}
+
+<main class={twMerge('grid gap-4', isPortrait ? 'md:grid-cols-2' : 'grid-cols-1')}>
 	<Image
 		images={data.asset.items}
 		alt={data.metadata['EXIF:ImageDescription']}
@@ -35,18 +57,26 @@
 		fetchpriority="high"
 		{aspectRatio}
 	/>
-	<h1 class=" mt-8 text-2xl font-semibold text-neutral-900">
-		{data.metadata['AVAIL:Title']}
-	</h1>
-	<span class="mb-2 block text-base font-semibold text-neutral-500"
-		>{data.metadata['AVAIL:Photographer']}</span
-	>
-	<p class="prose max-w-none text-neutral-900">{@html data.metadata['AVAIL:Description']}</p>
-	<div class="mt-6 flex flex-wrap gap-3">
-		{#each keywords as keyword}
-			<ImageTag {keyword} />
-		{/each}
+
+	<div>
+		<h1 class={twMerge('text-2xl font-bold text-neutral-900', isPortrait && 'mt-0')}>
+			{data.metadata['AVAIL:Title']}
+		</h1>
+
+		<p class="mb-6 max-w-none text-base text-neutral-900">
+			{@html data.metadata['AVAIL:Description']}
+		</p>
+		<div class="mt-2 flex gap-8">
+			{@render imageInfo('Photographer', photographer, `/?photographer=${photographer}`)}
+			{@render imageInfo('Album', data.metadata['AVAIL:Album'])}
+			{@render imageInfo('Location', location, location)}
+		</div>
+		<div class="mt-6 flex flex-wrap gap-3">
+			{#each keywords as keyword}
+				<ImageTag {keyword} />
+			{/each}
+		</div>
 	</div>
 </main>
 
-<RelatedImageGallery {keywords} parentImageId={data.metadata['AVAIL:NASAID'] ?? ''} />
+<RelatedImageGallery {keywords} parentImageId={data.metadata['AVAIL:NASAID'] ?? ''} class="mt-6" />

@@ -10,10 +10,14 @@
 	<Search />
 {/snippet}
 
-<div class="mx-auto min-h-screen max-w-[1440px] px-4 xl:p-0" data-sveltekit-preload-data="hover">
+<div
+	class="mx-auto min-h-screen max-w-[1440px] px-4 xl:p-0"
+	data-sveltekit-preload-data="hover"
+	data-sveltekit-reload
+>
 	<header class="py-7">
 		<nav class="gap flex w-full items-center gap-4">
-			<a href="/" class=" p-1.5">
+			<a href="/">
 				<span class="sr-only">Home</span>
 				<Logo />
 			</a>

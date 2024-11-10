@@ -8,7 +8,7 @@ export default {
 	theme: {
 		extend: {
 			fontFamily: {
-				sans: ['Noto Sans Variable']
+				sans: ['Inter Variable']
 			},
 			backgroundImage: {
 				'masonary-image-gradient':

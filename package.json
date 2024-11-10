@@ -52,7 +52,7 @@
 		"vitest": "^2.0.4"
 	},
 	"dependencies": {
-		"@fontsource-variable/noto-sans": "^5.1.0",
+		"@fontsource-variable/inter": "^5.1.0",
 		"tailwind-merge": "^2.5.4"
 	}
 }

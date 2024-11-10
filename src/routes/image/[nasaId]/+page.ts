@@ -3,7 +3,8 @@ import type { PageLoad } from './$types';
 
 const BASE_URL = 'https://images-api.nasa.gov';
 
-export const load: PageLoad = async ({ params, fetch }) => {
+export const load: PageLoad = async ({ params, fetch, depends }) => {
+	depends('url');
 	const assetReq = fetch(BASE_URL + `/asset/${params.nasaId}`);
 	const metadataReq = fetch(`https://images-assets.nasa.gov/image/${params.nasaId}/metadata.json`);
 

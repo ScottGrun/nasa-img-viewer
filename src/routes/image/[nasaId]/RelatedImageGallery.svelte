@@ -6,6 +6,7 @@
 	interface Props {
 		keywords?: string[];
 		parentImageId: string;
+		class?: string;
 	}
 
 	interface RelatedImages {
@@ -15,7 +16,7 @@
 		nasaId: string;
 	}
 
-	const { keywords, parentImageId }: Props = $props();
+	const { keywords, parentImageId, class: className }: Props = $props();
 	let relatedImages: RelatedImages[] = $state([]);
 
 	const fetchImages = async (keywords: string[]) => {
@@ -39,22 +40,18 @@
 		if (keywords && keywords.length > 0) {
 			let images = [];
 			images = await fetchImages(keywords);
-			if (relatedImages.length > 0) {
+			if (relatedImages.length > 3) {
 				images = await fetchImages(keywords.slice(0, 5));
 			}
 
-			relatedImages = images;
+			relatedImages = images.filter((el) => el.nasaId !== parentImageId);
 		}
-	});
-
-	$effect(() => {
-		console.log(relatedImages);
 	});
 </script>
 
 {#if relatedImages.length > 0}
-	<section>
-		<h2 class="mb-6 mt-12 text-2xl font-semibold text-neutral-900">Related images</h2>
+	<section class={className}>
+		<h2 class="mb-4 text-2xl font-bold text-neutral-900">Related images</h2>
 		<Masonary images={relatedImages} />
 	</section>
 {/if}
