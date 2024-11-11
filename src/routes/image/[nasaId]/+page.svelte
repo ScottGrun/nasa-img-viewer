@@ -32,11 +32,11 @@
 			{#if link}
 				<a
 					href={link}
-					class="text-primary-dark hover:text-nasa-red mt-2 block text-sm font-semibold transition-colors"
+					class="mt-2 block text-sm font-semibold text-primary-dark transition-colors hover:text-nasa-red"
 					>{value}</a
 				>
 			{:else}
-				<span class="text-primary-dark mt-2 block text-sm font-semibold">{value}</span>
+				<span class="mt-2 block text-sm font-semibold text-primary-dark">{value}</span>
 			{/if}
 		</div>
 	{/if}
@@ -54,7 +54,7 @@
 		/>
 
 		<div>
-			<h1 class={twMerge('text-primary-dark text-2xl font-extrabold', isPortrait && 'mt-0')}>
+			<h1 class={twMerge('text-2xl font-extrabold text-primary-dark', isPortrait && 'mt-0')}>
 				{metadata['AVAIL:Title']}
 			</h1>
 
@@ -67,7 +67,7 @@
 					photographer,
 					photographer && `/?photographer=${stripUnsafeUrlChars(photographer)}`
 				)}
-				{@render imageInfo('Album', metadata['AVAIL:Album'])}
+				{@render imageInfo('Album', metadata['AVAIL:Album'][0])}
 				{@render imageInfo(
 					'Location',
 					location,

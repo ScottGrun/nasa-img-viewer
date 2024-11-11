@@ -1,5 +1,5 @@
 import type { AssetManifestResponse, MetadataResponse } from '$lib/types';
-import type { PageLoad, PageServerLoad } from './$types';
+import type { PageServerLoad } from './$types';
 
 const BASE_URL = 'https://images-api.nasa.gov';
 

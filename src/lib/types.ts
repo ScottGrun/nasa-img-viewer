@@ -177,7 +177,7 @@ export interface MetadataResponse {
 	'EXIF:PhotometricInterpretation'?: string;
 	'File:ImageWidth'?: number;
 	'ICC_Profile:MeasurementIlluminant'?: string;
-	'AVAIL:Album'?: string;
+	'AVAIL:Album'?: string[];
 	'XMP:OriginalDocumentID'?: string;
 	'XMP:ModifyDate'?: string;
 	'ICC_Profile:ColorSpaceData'?: string;
