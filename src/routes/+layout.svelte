@@ -15,7 +15,7 @@
 	data-sveltekit-preload-data="hover"
 	data-sveltekit-reload
 >
-	<header class="py-7">
+	<header class="pb-4 pt-7">
 		<nav class="gap flex w-full items-center gap-4">
 			<a href="/">
 				<span class="sr-only">Home</span>
