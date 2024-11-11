@@ -54,6 +54,7 @@
 	},
 	"dependencies": {
 		"@fontsource-variable/inter": "^5.1.0",
+		"@fontsource/dm-mono": "^5.1.0",
 		"tailwind-merge": "^2.5.4"
 	},
 	"engines": {

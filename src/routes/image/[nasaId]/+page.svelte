@@ -4,78 +4,87 @@
 	import { twMerge } from 'tailwind-merge';
 	import type { PageData } from './$types';
 	import RelatedImageGallery from './RelatedImageGallery.svelte';
+	import { formatExifDate, stripUnsafeUrlChars } from '$lib/helpers';
 
 	interface Props {
 		data: PageData;
 	}
-
-	const stripUnsafeUrlChars = (text: string): string => {
-		// Replace all non-alphanumeric characters (except hyphen and underscore) with hyphens
-		// Then replace multiple consecutive hyphens with a single hyphen
-		// Finally trim any leading or trailing hyphens
-		return text
-			.replace(/[^a-zA-Z0-9-_]/g, ' ')
-			.replace(/-+/g, '-')
-			.replace(/^-|-$/g, '');
-	};
-
 	let { data }: Props = $props();
-	const keywords = (data.metadata['AVAIL:Keywords'] ?? []).map((keyword) =>
+	const { asset, metadata } = data;
+
+	const keywords = (metadata['AVAIL:Keywords'] ?? []).map((keyword) =>
 		stripUnsafeUrlChars(keyword)
 	);
-	const width = Number(data.metadata['EXIF:ImageWidth'] ?? data.metadata['File:ImageWidth'] ?? 16);
-	const height = Number(
-		data.metadata['EXIF:ImageHeight'] ?? data.metadata['File:ImageHeight'] ?? 9
-	);
-	const aspectRatio = width / height;
+	const width = Number(metadata['EXIF:ImageWidth'] ?? metadata['File:ImageWidth'] ?? 16);
+	const height = Number(metadata['EXIF:ImageHeight'] ?? metadata['File:ImageHeight'] ?? 9);
 	const isPortrait = width < height;
 
-	const photographer = data.metadata['AVAIL:Photographer'];
-	const location = data.metadata['AVAIL:Location'];
+	const photographer = metadata['AVAIL:Photographer'];
+	const location = metadata['AVAIL:Location'];
+	const date = metadata['EXIF:DateTimeOriginal'] ?? metadata['Composite:DateTimeOriginal'];
+	const year = date ? date?.split(':')[0] : undefined;
 </script>
 
 {#snippet imageInfo(name: string, value?: string, link?: string)}
 	{#if Boolean(value)}
 		<div>
-			<span class="block text-xs text-neutral-600">{name}</span>
+			<span class="block font-mono text-xs text-neutral-600">{name}</span>
 			{#if link}
-				<a href={link} class="mt-2 block text-sm font-semibold text-neutral-900">{value}</a>
+				<a
+					href={link}
+					class="text-primary-dark hover:text-nasa-red mt-2 block text-sm font-semibold transition-colors"
+					>{value}</a
+				>
 			{:else}
-				<span class="mt-2 block text-sm font-semibold text-neutral-900">{value}</span>
+				<span class="text-primary-dark mt-2 block text-sm font-semibold">{value}</span>
 			{/if}
 		</div>
 	{/if}
 {/snippet}
 
-<main class={twMerge('grid gap-4', isPortrait ? 'md:grid-cols-2' : 'grid-cols-1')}>
-	<Image
-		images={data.asset.items}
-		alt={data.metadata['EXIF:ImageDescription']}
-		class="mx-auto block w-full rounded-lg "
-		loading="eager"
-		fetchpriority="high"
-		{aspectRatio}
-	/>
+<div class="pb-6">
+	<main class={twMerge('grid gap-4', isPortrait ? 'md:grid-cols-2' : 'grid-cols-1')}>
+		<Image
+			images={asset.items}
+			alt={metadata['EXIF:ImageDescription']}
+			class="mx-auto block w-full rounded-lg "
+			loading="eager"
+			fetchpriority="high"
+			aspectRatio={width / height}
+		/>
 
-	<div>
-		<h1 class={twMerge('text-2xl font-bold text-neutral-900', isPortrait && 'mt-0')}>
-			{data.metadata['AVAIL:Title']}
-		</h1>
+		<div>
+			<h1 class={twMerge('text-primary-dark text-2xl font-extrabold', isPortrait && 'mt-0')}>
+				{metadata['AVAIL:Title']}
+			</h1>
 
-		<p class="mb-6 max-w-none text-base text-neutral-900">
-			{@html data.metadata['AVAIL:Description']}
-		</p>
-		<div class="mt-2 flex gap-8">
-			{@render imageInfo('Photographer', photographer, `/?photographer=${photographer}`)}
-			{@render imageInfo('Album', data.metadata['AVAIL:Album'])}
-			{@render imageInfo('Location', location, location)}
+			<p class=" prose-sm mb-6 max-w-none text-base text-neutral-800">
+				{@html metadata['AVAIL:Description']}
+			</p>
+			<div class="mt-2 flex gap-8">
+				{@render imageInfo(
+					'Photographer',
+					photographer,
+					photographer && `/?photographer=${stripUnsafeUrlChars(photographer)}`
+				)}
+				{@render imageInfo('Album', metadata['AVAIL:Album'])}
+				{@render imageInfo(
+					'Location',
+					location,
+					location && `/?location=${stripUnsafeUrlChars(location)}`
+				)}
+				{@render imageInfo(
+					'Date',
+					formatExifDate(date),
+					year && `/?year_start=${year}&year_end=${year}`
+				)}
+			</div>
+			<div class="mt-6 flex flex-wrap gap-3">
+				{#each keywords as keyword}
+					<ImageTag {keyword} />
+				{/each}
+			</div>
 		</div>
-		<div class="mt-6 flex flex-wrap gap-3">
-			{#each keywords as keyword}
-				<ImageTag {keyword} />
-			{/each}
-		</div>
-	</div>
-</main>
-
-<RelatedImageGallery {keywords} parentImageId={data.metadata['AVAIL:NASAID'] ?? ''} class="mt-6" />
+	</main>
+	<RelatedImageGallery {keywords} parentImageId={metadata['AVAIL:NASAID'] ?? ''} class="mt-6" />
+</div>

@@ -23,7 +23,13 @@
 			</a>
 			<form class="w-full" action="/" data-sveltekit-reload>
 				<label for="img-search" class="sr-only">Search for images</label>
-				<TextInput type="text" id="img-search" name="q" icon={searchIcon} />
+				<TextInput
+					type="text"
+					id="img-search"
+					name="q"
+					placeholder="Search for Apollo, wind tunnel, rogers dry lakebed"
+					icon={searchIcon}
+				/>
 			</form>
 		</nav>
 	</header>

@@ -51,7 +51,7 @@
 
 {#if relatedImages.length > 0}
 	<section class={className}>
-		<h2 class="mb-4 text-2xl font-bold text-neutral-900">Related images</h2>
+		<h2 class="text-primary-dark mb-4 text-2xl font-bold">Related images</h2>
 		<Masonary images={relatedImages} />
 	</section>
 {/if}

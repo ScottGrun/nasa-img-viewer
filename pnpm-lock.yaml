@@ -11,6 +11,9 @@ importers:
       '@fontsource-variable/inter':
         specifier: ^5.1.0
         version: 5.1.0
+      '@fontsource/dm-mono':
+        specifier: ^5.1.0
+        version: 5.1.0
       tailwind-merge:
         specifier: ^2.5.4
         version: 2.5.4
@@ -660,6 +663,9 @@ packages:
 
   '@fontsource-variable/inter@5.1.0':
     resolution: {integrity: sha512-Wj2dUGP0vUpxRGQTXQTCNJO+aLcFcQm+gUPXfj/aS877bQkEPBPv9JvZJpwdm2vzelt8NTZ+ausKlBCJjh2XIg==}
+
+  '@fontsource/dm-mono@5.1.0':
+    resolution: {integrity: sha512-cfowZUJJDHjgVFOEQmIn2KHtQ8LDXnTGgTTunUImzzg3Xf6V92MlYR/pmkqIt7lXq7lfP/pQZ9ph/9JeLDRsCQ==}
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -3347,6 +3353,8 @@ snapshots:
   '@fastify/busboy@2.1.1': {}
 
   '@fontsource-variable/inter@5.1.0': {}
+
+  '@fontsource/dm-mono@5.1.0': {}
 
   '@humanfs/core@0.19.1': {}
 

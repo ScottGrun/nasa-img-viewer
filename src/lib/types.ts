@@ -256,4 +256,5 @@ export interface MetadataResponse {
 	'ICC_Profile:ProfileDescription'?: string;
 	'ICC_Profile:GreenMatrixColumn'?: string;
 	'EXIF:ThumbnailOffset'?: number;
+	'EXIF:DateTimeOriginal'?: string;
 }
