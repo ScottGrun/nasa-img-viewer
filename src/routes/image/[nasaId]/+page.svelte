@@ -43,11 +43,11 @@
 {/snippet}
 
 <div class="pb-6">
-	<main class={twMerge('grid gap-4', isPortrait ? 'md:grid-cols-2' : 'grid-cols-1')}>
+	<main class={twMerge('grid gap-4', 'lg:grid-cols-[1fr_400px]')}>
 		<Image
 			images={asset.items}
 			alt={metadata['EXIF:ImageDescription']}
-			class="mx-auto block w-full rounded-lg "
+			class="mx-auto block  rounded-lg "
 			loading="eager"
 			fetchpriority="high"
 			aspectRatio={width / height}
