@@ -43,25 +43,26 @@
 {/snippet}
 
 <div class="pb-6">
+	<h1 class={twMerge('mb-2 text-2xl font-extrabold text-primary-dark')}>
+		{metadata['AVAIL:Title']}
+	</h1>
 	<main class={twMerge('grid gap-4', 'lg:grid-cols-[1fr_400px]')}>
-		<Image
-			images={asset.items}
-			alt={metadata['EXIF:ImageDescription']}
-			class="mx-auto block  rounded-lg "
-			loading="eager"
-			fetchpriority="high"
-			aspectRatio={width / height}
-		/>
+		<div>
+			<Image
+				images={asset.items}
+				alt={metadata['EXIF:ImageDescription']}
+				class="mx-auto  block rounded-lg"
+				loading="eager"
+				fetchpriority="high"
+				aspectRatio={width / height}
+			/>
+		</div>
 
 		<div>
-			<h1 class={twMerge('text-2xl font-extrabold text-primary-dark', isPortrait && 'mt-0')}>
-				{metadata['AVAIL:Title']}
-			</h1>
-
 			<p class=" prose-sm mb-6 max-w-none text-base text-neutral-800">
 				{@html metadata['AVAIL:Description']}
 			</p>
-			<div class="mt-2 flex gap-8">
+			<div class="mt-2 flex flex-wrap gap-8">
 				{@render imageInfo(
 					'Photographer',
 					photographer,
