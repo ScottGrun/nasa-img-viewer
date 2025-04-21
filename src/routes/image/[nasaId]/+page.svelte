@@ -17,7 +17,6 @@
 	);
 	const width = Number(metadata['EXIF:ImageWidth'] ?? metadata['File:ImageWidth'] ?? 16);
 	const height = Number(metadata['EXIF:ImageHeight'] ?? metadata['File:ImageHeight'] ?? 9);
-	const isPortrait = width < height;
 
 	const photographer = metadata['AVAIL:Photographer'];
 	const location = metadata['AVAIL:Location'];

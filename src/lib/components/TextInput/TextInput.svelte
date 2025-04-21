@@ -16,7 +16,7 @@
 		placeholder="Search image Eg. Landscape"
 		{...rest}
 		class={twMerge(
-			'placeholder:neutral-500 text-primary-dark w-full rounded-[4px] border-neutral-200 bg-neutral-50 px-3.5 py-2.5',
+			'placeholder:neutral-500 w-full rounded-[4px] border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-primary-dark',
 			icon && 'pr-8'
 		)}
 	/>

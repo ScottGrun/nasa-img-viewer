@@ -102,7 +102,6 @@
 	];
 
 	const parsedParams = $page.url.searchParams.values().toArray();
-	const categoryInfo = categories.find((el) => el.label === $page.url.searchParams.get('q'));
 </script>
 
 <nav class="no-scrollbar mb-3 flex gap-4 overflow-x-scroll py-1">
