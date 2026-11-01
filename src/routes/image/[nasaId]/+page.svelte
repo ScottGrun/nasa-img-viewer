@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import Image from '#lib/components/Image.svelte';
 	import ImageTag from '#lib/components/ImageTag.svelte';
 	import { twMerge } from 'tailwind-merge';
@@ -28,6 +29,10 @@
 	const year = $derived(date ? date.split(':')[0] : undefined);
 </script>
 
+<svelte:head>
+	<title>{metadata['AVAIL:Title']} | NASA Image Viewer</title>
+</svelte:head>
+
 {#snippet imageInfo(name: string, value?: string, query?: string)}
 	{#if Boolean(value)}
 		<div>
@@ -51,14 +56,16 @@
 	</h1>
 	<main class={twMerge('grid gap-4', 'lg:grid-cols-[1fr_400px]')}>
 		<div>
-			<Image
-				images={asset.items}
-				alt={metadata['EXIF:ImageDescription']}
-				class="mx-auto  block rounded-lg"
-				loading="eager"
-				fetchpriority="high"
-				aspectRatio={width / height}
-			/>
+			{#key page.params.nasaId}
+				<Image
+					images={asset.items}
+					alt={metadata['EXIF:ImageDescription']}
+					class="mx-auto  block rounded-lg"
+					loading="eager"
+					fetchpriority="high"
+					aspectRatio={width / height}
+				/>
+			{/key}
 		</div>
 
 		<div>
