@@ -37,11 +37,13 @@ export function preloadImage(url: string | undefined, env: PreloadEnv = defaultE
 	return true;
 }
 
+/** Preloads the detail image right away, e.g. on press, so it downloads while the page data loads. */
+export const preloadNow = (preview: PreviewSources): boolean =>
+	preloadImage(choosePreview(preview, matchMedia(WIDE_QUERY).matches));
+
 /** Preloads the detail image after a short hover. Returns a function that cancels a pending preload. */
 export function preloadOnIntent(preview: PreviewSources): () => void {
-	const timer = setTimeout(() => {
-		preloadImage(choosePreview(preview, matchMedia(WIDE_QUERY).matches));
-	}, HOVER_INTENT_MS);
+	const timer = setTimeout(() => preloadNow(preview), HOVER_INTENT_MS);
 	return () => clearTimeout(timer);
 }
 

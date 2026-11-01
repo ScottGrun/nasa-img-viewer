@@ -9,7 +9,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { twMerge } from 'tailwind-merge';
-	import { preloadOnIntent } from '#lib/preload.js';
+	import { preloadNow, preloadOnIntent } from '#lib/preload.js';
 	import Image from '../Image.svelte';
 
 	const {
@@ -59,6 +59,7 @@
 			class="mt-auto text-sm font-bold"
 			onpointerenter={(e) => e.pointerType === 'mouse' && startPreload()}
 			onpointerleave={stopPreload}
+			onpointerdown={() => preloadNow(preview)}
 			onfocus={(e) => e.currentTarget.matches(':focus-visible') && startPreload()}
 			onblur={stopPreload}>{title}</a
 		>
