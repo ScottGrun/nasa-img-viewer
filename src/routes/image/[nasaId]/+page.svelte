@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import Image from '#lib/components/Image.svelte';
 	import ImageTag from '#lib/components/ImageTag.svelte';
 	import { twMerge } from 'tailwind-merge';
@@ -29,13 +30,13 @@
 	const year = $derived(date ? date.split(':')[0] : undefined);
 </script>
 
-{#snippet imageInfo(name: string, value?: string, link?: string)}
+{#snippet imageInfo(name: string, value?: string, query?: string)}
 	{#if Boolean(value)}
 		<div>
 			<span class="block font-mono text-xs text-neutral-600">{name}</span>
-			{#if link}
+			{#if query}
 				<a
-					href={link}
+					href={resolve(`/?${query}`)}
 					class="mt-2 block text-sm font-semibold text-primary-dark transition-colors hover:text-nasa-red"
 					>{value}</a
 				>
@@ -64,28 +65,29 @@
 
 		<div>
 			<p class=" prose-sm mb-6 max-w-none text-base text-neutral-800">
+				<!-- eslint-disable-next-line svelte/no-at-html-tags -- NASA API description is trusted HTML markup from the NASA Image API -->
 				{@html metadata['AVAIL:Description']}
 			</p>
 			<div class="mt-2 flex flex-wrap gap-8">
 				{@render imageInfo(
 					'Photographer',
 					photographer,
-					photographer && `/?photographer=${stripUnsafeUrlChars(photographer)}`
+					photographer && `photographer=${stripUnsafeUrlChars(photographer)}`
 				)}
 				{@render imageInfo('Album', metadata['AVAIL:Album']?.[0])}
 				{@render imageInfo(
 					'Location',
 					location,
-					location && `/?location=${stripUnsafeUrlChars(location)}`
+					location && `location=${stripUnsafeUrlChars(location)}`
 				)}
 				{@render imageInfo(
 					'Date',
 					formatExifDate(date),
-					year && `/?year_start=${year}&year_end=${year}`
+					year && `year_start=${year}&year_end=${year}`
 				)}
 			</div>
 			<div class="mt-6 flex flex-wrap gap-3">
-				{#each keywords as keyword}
+				{#each keywords as keyword, i (`${keyword}:${i}`)}
 					<ImageTag {keyword} />
 				{/each}
 			</div>

@@ -11,7 +11,7 @@
 </script>
 
 <div class={twMerge('columns-1 gap-2 md:columns-2 lg:columns-3', className)}>
-	{#each images as image}
+	{#each images as image (image.nasaId)}
 		<MasonaryImage {...image} class="mb-2 w-full " />
 	{/each}
 </div>

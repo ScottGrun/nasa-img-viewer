@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '../app.css';
+	import { resolve } from '$app/paths';
 	import Logo from '#lib/assets/icons/Logo.svelte';
 	import Search from '#lib/assets/icons/Search.svelte';
 	import TextInput from '#lib/components/TextInput/TextInput.svelte';
@@ -17,7 +18,7 @@
 >
 	<header class="pt-7 pb-4">
 		<nav class="gap flex w-full items-center gap-4">
-			<a href="/">
+			<a href={resolve('/')}>
 				<span class="sr-only">Home</span>
 				<Logo />
 			</a>

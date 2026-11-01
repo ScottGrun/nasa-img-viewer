@@ -1,18 +1,19 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { twMerge } from 'tailwind-merge';
 
 	interface Props {
 		label: string;
-		path: string;
+		query: string;
 		imageUrl: string;
 		isActive?: boolean;
 	}
 
-	const { label, path, imageUrl, isActive }: Props = $props();
+	const { label, query, imageUrl, isActive }: Props = $props();
 </script>
 
 <a
-	href={path}
+	href={resolve(`/?${query}`)}
 	class={twMerge(
 		'flex w-fit shrink-0 items-center gap-3 rounded-full bg-neutral-50 p-1 font-medium text-neutral-600 transition-colors hover:bg-neutral-100',
 		isActive && 'bg-indigo-50 font-semibold text-neutral-900'

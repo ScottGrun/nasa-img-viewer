@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	interface Props {
 		keyword: string;
 	}
@@ -6,7 +7,7 @@
 </script>
 
 <a
-	href={`/?q=${keyword}`}
+	href={resolve(`/?q=${keyword}`)}
 	class="block rounded-sm bg-gray-50 px-2 py-1 text-sm font-medium text-neutral-600 transition-colors hover:bg-gray-200"
 	>{keyword}</a
 >

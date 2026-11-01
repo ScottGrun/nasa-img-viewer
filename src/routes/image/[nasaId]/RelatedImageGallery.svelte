@@ -38,8 +38,7 @@
 
 	onMount(async () => {
 		if (keywords && keywords.length > 0) {
-			let images = [];
-			images = await fetchImages(keywords);
+			let images = await fetchImages(keywords);
 			if (relatedImages.length > 3) {
 				images = await fetchImages(keywords.slice(0, 5));
 			}
