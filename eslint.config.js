@@ -6,7 +6,14 @@ import globals from 'globals';
 import ts from 'typescript-eslint';
 
 export default defineConfig(
-	globalIgnores(['build/', '.svelte-kit/', 'dist/', 'test-results/', 'playwright-report/']),
+	globalIgnores([
+		'.wrangler/',
+		'build/',
+		'.svelte-kit/',
+		'dist/',
+		'test-results/',
+		'playwright-report/'
+	]),
 	js.configs.recommended,
 	ts.configs.recommended,
 	svelte.configs.recommended,
