@@ -59,7 +59,7 @@
 			class="mt-auto text-sm font-bold"
 			onpointerenter={(e) => e.pointerType === 'mouse' && startPreload()}
 			onpointerleave={stopPreload}
-			onpointerdown={() => preloadNow(preview)}
+			onpointerdown={(e) => e.pointerType === 'mouse' && preloadNow(preview)}
 			onfocus={(e) => e.currentTarget.matches(':focus-visible') && startPreload()}
 			onblur={stopPreload}>{title}</a
 		>
