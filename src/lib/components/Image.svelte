@@ -9,7 +9,8 @@
 	}
 
 	const { class: className, images, aspectRatio = 16 / 9, ...rest }: Props = $props();
-	let naturalAspectRatio = $state(aspectRatio);
+	// Derived from the prop, but overwritten with the measured ratio once the image loads
+	let naturalAspectRatio = $derived(aspectRatio);
 	let imageElement: HTMLImageElement | undefined = $state(undefined);
 	let imageLoaded = $state(false);
 
@@ -30,13 +31,13 @@
 	};
 
 	// Get different image sizes
-	const large = getImageBySize('~orig') ?? getImageBySize('~large');
-	const medium = getImageBySize('~medium');
-	const small = getImageBySize('~small');
-	const thumbnail = getImageBySize('~thumb');
+	const large = $derived(getImageBySize('~orig') ?? getImageBySize('~large'));
+	const medium = $derived(getImageBySize('~medium'));
+	const small = $derived(getImageBySize('~small'));
+	const thumbnail = $derived(getImageBySize('~thumb'));
 
 	// Default fallback if no other sizes are available
-	const fallback = small || medium || large || thumbnail;
+	const fallback = $derived(small || medium || large || thumbnail);
 </script>
 
 <div

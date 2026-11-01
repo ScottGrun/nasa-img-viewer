@@ -10,18 +10,23 @@
 		data: PageData;
 	}
 	let { data }: Props = $props();
-	const { asset, metadata } = data;
+	const asset = $derived(data.asset);
+	const metadata = $derived(data.metadata);
 
-	const keywords = (metadata['AVAIL:Keywords'] ?? []).map((keyword) =>
-		stripUnsafeUrlChars(keyword)
+	const keywords = $derived(
+		(metadata['AVAIL:Keywords'] ?? []).map((keyword) => stripUnsafeUrlChars(keyword))
 	);
-	const width = Number(metadata['EXIF:ImageWidth'] ?? metadata['File:ImageWidth'] ?? 16);
-	const height = Number(metadata['EXIF:ImageHeight'] ?? metadata['File:ImageHeight'] ?? 9);
+	const width = $derived(Number(metadata['EXIF:ImageWidth'] ?? metadata['File:ImageWidth'] ?? 16));
+	const height = $derived(
+		Number(metadata['EXIF:ImageHeight'] ?? metadata['File:ImageHeight'] ?? 9)
+	);
 
-	const photographer = metadata['AVAIL:Photographer'];
-	const location = metadata['AVAIL:Location'];
-	const date = metadata['EXIF:DateTimeOriginal'] ?? metadata['Composite:DateTimeOriginal'];
-	const year = date ? date?.split(':')[0] : undefined;
+	const photographer = $derived(metadata['AVAIL:Photographer']);
+	const location = $derived(metadata['AVAIL:Location']);
+	const date = $derived(
+		metadata['EXIF:DateTimeOriginal'] ?? metadata['Composite:DateTimeOriginal']
+	);
+	const year = $derived(date ? date.split(':')[0] : undefined);
 </script>
 
 {#snippet imageInfo(name: string, value?: string, link?: string)}
@@ -67,7 +72,7 @@
 					photographer,
 					photographer && `/?photographer=${stripUnsafeUrlChars(photographer)}`
 				)}
-				{@render imageInfo('Album', metadata['AVAIL:Album'][0])}
+				{@render imageInfo('Album', metadata['AVAIL:Album']?.[0])}
 				{@render imageInfo(
 					'Location',
 					location,
@@ -86,5 +91,8 @@
 			</div>
 		</div>
 	</main>
-	<RelatedImageGallery {keywords} parentImageId={metadata['AVAIL:NASAID'] ?? ''} class="mt-6" />
+	<!-- The gallery fetches on mount, so remount it when the displayed image changes -->
+	{#key metadata['AVAIL:NASAID']}
+		<RelatedImageGallery {keywords} parentImageId={metadata['AVAIL:NASAID'] ?? ''} class="mt-6" />
+	{/key}
 </div>

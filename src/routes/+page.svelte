@@ -10,15 +10,17 @@
 
 	let { data }: Props = $props();
 
-	const images = data.items.map((image) => {
-		const imageData = image.data[0];
-		return {
-			url: image.links[0].href, // this grabs the thumbnail from each image
-			description: imageData.description,
-			title: imageData.title,
-			nasaId: imageData.nasa_id
-		};
-	});
+	const images = $derived(
+		data.items.map((image) => {
+			const imageData = image.data[0];
+			return {
+				url: image.links[0].href, // this grabs the thumbnail from each image
+				description: imageData.description,
+				title: imageData.title,
+				nasaId: imageData.nasa_id
+			};
+		})
+	);
 
 	const categories = [
 		{
@@ -101,7 +103,7 @@
 		}
 	];
 
-	const parsedParams = page.url.searchParams.values().toArray();
+	const parsedParams = $derived(page.url.searchParams.values().toArray());
 </script>
 
 <nav class="no-scrollbar mb-3 flex gap-4 overflow-x-scroll py-1">
