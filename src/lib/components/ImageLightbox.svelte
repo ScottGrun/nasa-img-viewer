@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { pickBySize } from '#lib/images.js';
-	import { fitSize } from '#lib/magnifier.js';
+	import { fitSize, LIGHTBOX_BACKGROUND } from '#lib/magnifier.js';
 	import type { AssetManifestItem } from '#lib/types.js';
 	import ImageMagnifier from './ImageMagnifier.svelte';
 
@@ -176,7 +176,12 @@
 	aria-label="Full screen image"
 	class="m-0 h-screen max-h-none w-screen max-w-none items-center justify-center overflow-hidden border-0 bg-transparent p-0 backdrop:bg-transparent open:flex"
 >
-	<div bind:this={overlay} class="absolute inset-0 bg-black/95"></div>
+	<div
+		bind:this={overlay}
+		data-testid="lightbox-backdrop"
+		class="absolute inset-0"
+		style="background-color:{LIGHTBOX_BACKGROUND}"
+	></div>
 	<button
 		bind:this={closeButtonEl}
 		type="button"
@@ -191,7 +196,7 @@
 	<div
 		bind:this={pictureEl}
 		data-testid="lightbox-picture"
-		class="relative will-change-transform"
+		class="relative"
 		style="width:{size.w}px;height:{size.h}px;transform-origin:0 0"
 	>
 		<ImageMagnifier

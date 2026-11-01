@@ -11,6 +11,7 @@
 		minimapSize,
 		nativeZoom,
 		nextMinimapCorner,
+		LIGHTBOX_BACKGROUND,
 		visibleBox,
 		wheelLens,
 		wheelZoom,
@@ -206,8 +207,8 @@
 		<div
 			aria-hidden="true"
 			data-testid="magnifier-minimap"
-			class="pointer-events-none fixed top-0 left-0 z-40 overflow-hidden rounded-md border border-white bg-neutral-50 shadow-lg ring-1 ring-black/20"
-			style="width:{map.w}px;height:{map.h}px;transform:translate({origin.left}px,{origin.top}px)"
+			class="pointer-events-none fixed top-0 left-0 z-40 overflow-hidden rounded-md border border-white shadow-lg ring-1 ring-black/20"
+			style="background-color:{LIGHTBOX_BACKGROUND};width:{map.w}px;height:{map.h}px;transform:translate({origin.left}px,{origin.top}px)"
 		>
 			<img src={thumbSrc} alt="" class="block size-full max-w-none" />
 			<div
@@ -221,8 +222,8 @@
 	<div
 		aria-hidden="true"
 		data-testid="magnifier-glass"
-		class="pointer-events-none fixed top-0 left-0 z-50 overflow-hidden rounded-full border-4 border-white bg-neutral-50 shadow-xl ring-1 ring-black/20"
-		style="width:{diameter}px;height:{diameter}px;transform:translate({spot.clientX -
+		class="pointer-events-none fixed top-0 left-0 z-50 overflow-hidden rounded-full border-4 border-white shadow-xl ring-1 ring-black/20"
+		style="background-color:{LIGHTBOX_BACKGROUND};width:{diameter}px;height:{diameter}px;transform:translate({spot.clientX -
 			radius}px,{spot.clientY - radius}px)"
 	>
 		<img

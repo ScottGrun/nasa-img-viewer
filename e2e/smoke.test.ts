@@ -668,6 +668,28 @@ test.describe('image lightbox', () => {
 		expect(state).toEqual({ count: 2, before: 'paused', after: 'finished' });
 	});
 
+	test('the glass background matches the lightbox backdrop', async ({ page }) => {
+		const requested: string[] = [];
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await load(page, requested);
+		await trigger(page).click();
+		await expect(dialog(page)).toBeVisible();
+		await settled(page);
+		const box = (await picture(page).boundingBox())!;
+		// Near the corner, so part of the glass lies beyond the image.
+		await page.mouse.move(box.x + 2, box.y + 2);
+		await page.mouse.move(box.x + 4, box.y + 4);
+		await expect(glass(page)).toBeVisible();
+		const colours = await page.evaluate(() => ({
+			backdrop: getComputedStyle(document.querySelector('[data-testid="lightbox-backdrop"]')!)
+				.backgroundColor,
+			glass: getComputedStyle(document.querySelector('[data-testid="magnifier-glass"]')!)
+				.backgroundColor
+		}));
+		expect(colours.glass).toBe(colours.backdrop);
+		expect(colours.glass).not.toBe('rgb(255, 255, 255)');
+	});
+
 	test('reduced motion opens without a movement animation', async ({ page }) => {
 		const requested: string[] = [];
 		await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -683,6 +705,91 @@ test.describe('image lightbox', () => {
 		);
 		expect(keyframes.length).toBeGreaterThan(0);
 		expect(keyframes.flat()).not.toContain('transform');
+	});
+
+	test.describe('glass alignment', () => {
+		// The glass must sit exactly on the cursor and show the image point under it.
+		const checkAlignment = async (page: Page, label: string) => {
+			const pic = (await picture(page).boundingBox())!;
+			const points: [number, number][] = [
+				[0.5, 0.5],
+				[0.06, 0.08],
+				[0.94, 0.08],
+				[0.06, 0.92],
+				[0.94, 0.92]
+			];
+			for (const [fx, fy] of points) {
+				const mx = pic.x + pic.width * fx;
+				const my = pic.y + pic.height * fy;
+				await page.mouse.move(mx - 5, my - 3);
+				await page.mouse.move(mx, my);
+				await expect(glass(page)).toBeVisible();
+				const m = await page.evaluate(() => {
+					const g = document.querySelector('[data-testid="magnifier-glass"]')!;
+					const i = g.querySelector('img')!;
+					const gr = g.getBoundingClientRect();
+					const ir = i.getBoundingClientRect();
+					return {
+						gx: gr.x + gr.width / 2,
+						gy: gr.y + gr.height / 2,
+						ix: ir.x,
+						iy: ir.y,
+						iw: ir.width,
+						ih: ir.height
+					};
+				});
+				// Centre of the glass is on the mouse.
+				expect(Math.abs(m.gx - mx), `${label} glass x at ${fx},${fy}`).toBeLessThanOrEqual(2);
+				expect(Math.abs(m.gy - my), `${label} glass y at ${fx},${fy}`).toBeLessThanOrEqual(2);
+				// The image point under the glass's centre is the one under the cursor.
+				const imgX = ((m.gx - m.ix) / m.iw) * pic.width + pic.x;
+				const imgY = ((m.gy - m.iy) / m.ih) * pic.height + pic.y;
+				expect(Math.abs(imgX - mx), `${label} image x at ${fx},${fy}`).toBeLessThanOrEqual(2);
+				expect(Math.abs(imgY - my), `${label} image y at ${fx},${fy}`).toBeLessThanOrEqual(2);
+			}
+		};
+
+		test('the glass is centred on the cursor and shows the point under it', async ({ page }) => {
+			test.setTimeout(90_000);
+			const requested: string[] = [];
+			await page.setViewportSize({ width: 1280, height: 800 });
+			await load(page, requested);
+			// Open with the page scrolled.
+			await page.evaluate(() => window.scrollTo(0, 150));
+			await trigger(page).click();
+			await expect(dialog(page)).toBeVisible();
+			await settled(page);
+
+			await checkAlignment(page, 'default');
+			await page.mouse.wheel(0, -300);
+			await checkAlignment(page, 'zoomed');
+			await page.keyboard.down('Control');
+			await page.mouse.wheel(0, -300);
+			await page.keyboard.up('Control');
+			await checkAlignment(page, 'resized');
+			await page.keyboard.down('Control');
+			await page.mouse.wheel(0, 3000);
+			await page.keyboard.up('Control');
+			await checkAlignment(page, 'shrunk');
+
+			// Close and reopen: still aligned.
+			await page.keyboard.press('Escape');
+			await expect(dialog(page)).toBeHidden();
+			await trigger(page).click();
+			await expect(dialog(page)).toBeVisible();
+			await settled(page);
+			await checkAlignment(page, 'reopened');
+
+			// The minimap marker still tracks, and the minimap and hint stay inside the viewport.
+			const mm = (await minimap(page).boundingBox())!;
+			const hb = (await hint(page).boundingBox())!;
+			for (const b of [mm, hb]) {
+				expect(b.x).toBeGreaterThanOrEqual(0);
+				expect(b.y).toBeGreaterThanOrEqual(0);
+				expect(b.x + b.width).toBeLessThanOrEqual(1280);
+				expect(b.y + b.height).toBeLessThanOrEqual(800);
+			}
+		});
 	});
 
 	test.describe('touch', () => {

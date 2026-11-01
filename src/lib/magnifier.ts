@@ -157,3 +157,6 @@ export const fitSize = (aspect: number, viewport: Size, maxWidth?: number): Size
 	}
 	return { w, h: w / safe };
 };
+
+/** Near-black used by the lightbox backdrop and by the glass behind the image, defined once. */
+export const LIGHTBOX_BACKGROUND = '#0b0b0c';
