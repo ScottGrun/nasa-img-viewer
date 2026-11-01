@@ -4,6 +4,8 @@
 	import type { AssetManifestItem } from '#lib/types.js';
 	import ImageMagnifier from './ImageMagnifier.svelte';
 
+	type Rect = { left: number; top: number; width: number; height: number };
+
 	interface Props {
 		images: AssetManifestItem[];
 		alt?: string;
@@ -14,14 +16,16 @@
 			src: string;
 			aspect: number;
 			/** The page image's rect when opened, the start of the entrance animation. */
-			rect?: { left: number; top: number; width: number; height: number };
+			rect?: Rect;
 			/** Mouse position at the opening click, if it was a mouse. */
 			pointer?: { x: number; y: number };
 		};
+		/** The page image's current rect, where the exit animation lands. */
+		targetRect?: () => Rect | undefined;
 		onclose: () => void;
 	}
 
-	const { images, alt = '', originalWidth, initial, onclose }: Props = $props();
+	const { images, alt = '', originalWidth, initial, targetRect, onclose }: Props = $props();
 
 	interface Connection {
 		saveData?: boolean;
@@ -35,6 +39,9 @@
 	let failed = $state(false);
 	/** True during the entrance animation: the original is not swapped in and the glass stays off. */
 	let animating = $state(true);
+	/** True once closing has started: the glass is gone and further close requests are ignored. */
+	let closing = $state(false);
+	let entrance: Animation[] = [];
 	let overlay: HTMLDivElement | undefined = $state(undefined);
 	let closeButtonEl: HTMLButtonElement | undefined = $state(undefined);
 	let pictureEl: HTMLDivElement | undefined = $state(undefined);
@@ -55,6 +62,19 @@
 	const sourceWidth = $derived(loadedWidth ?? originalWidth);
 	const loading = $derived(!loadedSrc && !failed);
 	const size = $derived(fitSize(initial.aspect, { w: viewportW, h: viewportH }, sourceWidth));
+
+	const isUsable = (rect: Rect | undefined): rect is Rect =>
+		rect !== undefined &&
+		rect.width > 0 &&
+		rect.height > 0 &&
+		rect.left < window.innerWidth &&
+		rect.top < window.innerHeight &&
+		rect.left + rect.width > 0 &&
+		rect.top + rect.height > 0;
+
+	/** Transform that maps the picture's laid-out rect onto `rect`. */
+	const transformTo = (rect: Rect, layout: DOMRect) =>
+		`translate(${rect.left - layout.left}px, ${rect.top - layout.top}px) scale(${rect.width / layout.width}, ${rect.height / layout.height})`;
 
 	// Modal dialog: top layer, focus trap, inert page, Esc and focus return come from the platform.
 	// Page scroll is locked while open and restored afterwards. The picture grows from the page
@@ -82,22 +102,13 @@
 		const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 		const ease = 'cubic-bezier(0.2, 0, 0, 1)';
 		const fadeKeys = [{ opacity: 0 }, { opacity: 1 }];
-		const onScreen =
-			from !== undefined &&
-			from.width > 0 &&
-			from.height > 0 &&
-			from.left < window.innerWidth &&
-			from.top < window.innerHeight &&
-			from.left + from.width > 0 &&
-			from.top + from.height > 0;
-
 		const animations: Animation[] = [];
 		let duration = 280;
 		if (reduced) {
 			duration = 80;
 			animations.push(picture.animate(fadeKeys, { duration, easing: 'linear' }));
-		} else if (onScreen && from && to.width > 0 && to.height > 0) {
-			const transform = `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})`;
+		} else if (isUsable(from) && to.width > 0 && to.height > 0) {
+			const transform = transformTo(from, to);
 			animations.push(
 				picture.animate([{ transform }, { transform: 'none' }], { duration, easing: ease })
 			);
@@ -117,6 +128,7 @@
 			if (target) animations.push(target.animate(fadeKeys, { duration, easing: 'linear' }));
 		}
 
+		entrance = animations;
 		Promise.all(animations.map((animation) => animation.finished))
 			.then(() => {
 				if (stale) return;
@@ -131,6 +143,7 @@
 		return () => {
 			stale = true;
 			for (const animation of animations) animation.cancel();
+			entrance = [];
 			window.removeEventListener('pointermove', onMove);
 			root.style.overflow = previousOverflow;
 			if (el.open) el.close();
@@ -160,9 +173,78 @@
 		};
 	});
 
+	// The one way out for Esc, the X button and the backdrop: the picture flies back to the page
+	// image (transform only) while the backdrop and close button fade out, then the dialog closes.
+	const requestClose = () => {
+		const el = dialog;
+		const picture = pictureEl;
+		if (closing || !el || !picture) return;
+		closing = true;
+
+		// Where the picture is right now, which may be mid-entrance; then drop the entrance.
+		const current = picture.getBoundingClientRect();
+		for (const animation of entrance) animation.cancel();
+		entrance = [];
+		const layout = picture.getBoundingClientRect();
+		const target = targetRect?.();
+
+		if (matchMedia('(prefers-reduced-motion: reduce)').matches || layout.width === 0) {
+			el.close();
+			return;
+		}
+
+		const duration = 220;
+		const easing = 'cubic-bezier(0.4, 0, 1, 1)';
+		const animations: Animation[] = [];
+		if (isUsable(target)) {
+			animations.push(
+				picture.animate(
+					[{ transform: transformTo(current, layout) }, { transform: transformTo(target, layout) }],
+					{ duration, easing, fill: 'forwards' }
+				)
+			);
+		} else {
+			animations.push(
+				picture.animate(
+					[
+						{ opacity: 1, transform: 'none' },
+						{ opacity: 0, transform: 'scale(0.96)' }
+					],
+					{ duration: 160, easing, fill: 'forwards' }
+				)
+			);
+		}
+		for (const node of [overlay, closeButtonEl]) {
+			if (node) {
+				animations.push(
+					node.animate([{ opacity: 1 }, { opacity: 0 }], {
+						duration,
+						easing: 'linear',
+						fill: 'forwards'
+					})
+				);
+			}
+		}
+		Promise.all(animations.map((animation) => animation.finished))
+			.then(() => {
+				// Nothing is left behind: cancel the held end state and close in the same task.
+				for (const animation of animations) animation.cancel();
+				el.close();
+			})
+			.catch(() => {
+				// Cancelled because the component went away.
+			});
+	};
+
 	// Clicks that land on the backdrop (anything that is not a button) close the dialog.
 	const onBackdropClick = (event: MouseEvent) => {
-		if (!(event.target as Element).closest('button')) dialog?.close();
+		if (!(event.target as Element).closest('button')) requestClose();
+	};
+
+	// Esc: take over from the platform's instant close.
+	const onCancel = (event: Event) => {
+		event.preventDefault();
+		requestClose();
 	};
 </script>
 
@@ -173,6 +255,7 @@
 	bind:this={dialog}
 	{onclose}
 	onclick={onBackdropClick}
+	oncancel={onCancel}
 	aria-label="Full screen image"
 	class="m-0 h-screen max-h-none w-screen max-w-none items-center justify-center overflow-hidden border-0 bg-transparent p-0 backdrop:bg-transparent open:flex"
 >
@@ -187,7 +270,7 @@
 		type="button"
 		aria-label="Close full screen view"
 		class="absolute top-4 right-4 z-20 flex size-10 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/25 focus-visible:outline-2 focus-visible:outline-white"
-		onclick={() => dialog?.close()}
+		onclick={requestClose}
 	>
 		<svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="2">
 			<path d="M6 6l12 12M18 6L6 18" stroke-linecap="round" />
@@ -201,7 +284,7 @@
 	>
 		<ImageMagnifier
 			bind:this={magnifier}
-			suspended={animating}
+			suspended={animating || closing}
 			src={shownSrc}
 			thumbSrc={initial.src}
 			{sourceWidth}

@@ -123,6 +123,11 @@
 		enabled = !enabled;
 	};
 
+	// Hide everything as soon as the glass is suspended (entrance or exit animation).
+	$effect(() => {
+		if (suspended) spot = null;
+	});
+
 	// Non-passive wheel listener so the page can be kept from scrolling while the glass is active.
 	$effect(() => {
 		const el = button;

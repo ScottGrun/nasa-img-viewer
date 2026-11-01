@@ -572,6 +572,7 @@ test.describe('image lightbox', () => {
 		page.addInitScript((shouldPause) => {
 			const w = window as unknown as { __anims: Animation[] };
 			w.__anims = [];
+			(w as unknown as { __hold: boolean }).__hold = shouldPause;
 			const original = Element.prototype.animate;
 			Element.prototype.animate = function (
 				this: Element,
@@ -580,7 +581,7 @@ test.describe('image lightbox', () => {
 				const animation = original.apply(this, args);
 				if (this.getAttribute('data-testid') === 'lightbox-picture') {
 					w.__anims.push(animation);
-					if (shouldPause) animation.pause();
+					if ((w as unknown as { __hold: boolean }).__hold) animation.pause();
 				}
 				return animation;
 			};
@@ -652,9 +653,16 @@ test.describe('image lightbox', () => {
 		await load(page, requested);
 		await trigger(page).click();
 		await expect(dialog(page)).toBeVisible();
+		// Esc while the entrance is still running: let the exit play normally.
+		const setHold = (hold: boolean) =>
+			page.evaluate((value) => {
+				(window as unknown as { __hold: boolean }).__hold = value;
+			}, hold);
+		await setHold(false);
 		await page.keyboard.press('Escape');
 		await expect(dialog(page)).toBeHidden();
 		await expect(trigger(page)).toBeFocused();
+		await setHold(true);
 		await trigger(page).click();
 		await expect(dialog(page)).toBeVisible();
 		const state = await page.evaluate(async () => {
@@ -665,7 +673,7 @@ test.describe('image lightbox', () => {
 			await a.finished;
 			return { count: anims.length, before, after: a.playState };
 		});
-		expect(state).toEqual({ count: 2, before: 'paused', after: 'finished' });
+		expect(state).toEqual({ count: 3, before: 'paused', after: 'finished' });
 	});
 
 	test('the glass background matches the lightbox backdrop', async ({ page }) => {
@@ -688,6 +696,112 @@ test.describe('image lightbox', () => {
 		}));
 		expect(colours.glass).toBe(colours.backdrop);
 		expect(colours.glass).not.toBe('rgb(255, 255, 255)');
+	});
+
+	test('closing animates back to the page image, then closes (Esc, X, backdrop)', async ({
+		page
+	}) => {
+		test.setTimeout(60_000);
+		const requested: string[] = [];
+		await watchAnimations(page, false);
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await load(page, requested);
+		await page.evaluate(() => window.scrollTo(0, 120));
+		const scrollBefore = await page.evaluate(() => window.scrollY);
+		const pageRect = (await trigger(page).locator('img').boundingBox())!;
+
+		for (const how of ['escape', 'button', 'backdrop'] as const) {
+			await trigger(page).click();
+			await expect(dialog(page)).toBeVisible();
+			await settled(page);
+			await page.mouse.move(640, 400);
+			await page.mouse.move(645, 400);
+			await expect(glass(page)).toBeVisible();
+			const startRect = (await picture(page).boundingBox())!;
+
+			// Hold the exit so it can be inspected.
+			await page.evaluate(() => {
+				(window as unknown as { __hold: boolean }).__hold = true;
+			});
+			if (how === 'escape') await page.keyboard.press('Escape');
+			if (how === 'button') await closeButton(page).click();
+			if (how === 'backdrop') await page.mouse.click(8, 400);
+
+			const info = await page.evaluate(() => {
+				const anims = (window as unknown as { __anims: Animation[] }).__anims;
+				const a = anims[anims.length - 1];
+				const effect = a.effect as KeyframeEffect;
+				const picture = document.querySelector('[data-testid="lightbox-picture"]')!;
+				const start = picture.getBoundingClientRect();
+				a.currentTime = 220;
+				const end = picture.getBoundingClientRect();
+				return {
+					open: document.querySelector('dialog')!.open,
+					state: a.playState,
+					duration: effect.getTiming().duration,
+					keys: effect.getKeyframes().flatMap((f) => Object.keys(f)),
+					glass: document.querySelectorAll('[data-testid="magnifier-glass"]').length,
+					minimap: document.querySelectorAll('[data-testid="magnifier-minimap"]').length,
+					hint: document.querySelectorAll('[data-testid="magnifier-hint"]').length,
+					start: { x: start.x, y: start.y, w: start.width },
+					end: { x: end.x, y: end.y, w: end.width, h: end.height }
+				};
+			});
+			expect(info.open, `${how}: still open during exit`).toBe(true);
+			expect(info.duration).toBe(220);
+			expect(info.keys).toContain('transform');
+			expect(info.keys).not.toContain('opacity');
+			expect(info.glass + info.minimap + info.hint).toBe(0);
+			// It starts where the picture was and lands on the page image.
+			expect(Math.abs(info.start.x - startRect.x)).toBeLessThanOrEqual(1);
+			expect(Math.abs(info.start.w - startRect.width)).toBeLessThanOrEqual(1);
+			expect(Math.abs(info.end.x - pageRect.x)).toBeLessThanOrEqual(1);
+			expect(Math.abs(info.end.y - pageRect.y)).toBeLessThanOrEqual(1);
+			expect(Math.abs(info.end.w - pageRect.width)).toBeLessThanOrEqual(1);
+			expect(Math.abs(info.end.h - pageRect.height)).toBeLessThanOrEqual(1);
+
+			// A second close request while exiting is ignored.
+			await page.evaluate(() => {
+				(window as unknown as { __hold: boolean }).__hold = false;
+			});
+			expect(
+				await page.evaluate(() => {
+					const anims = (window as unknown as { __anims: Animation[] }).__anims;
+					const before = anims.length;
+					document.querySelector<HTMLElement>('[aria-label="Close full screen view"]')!.click();
+					return before === anims.length;
+				})
+			).toBe(true);
+			// Let it finish: only now does the dialog close.
+			await page.evaluate(async () => {
+				const anims = (window as unknown as { __anims: Animation[] }).__anims;
+				anims[anims.length - 1].finish();
+			});
+			await expect(dialog(page)).toBeHidden();
+			await expect(trigger(page)).toBeFocused();
+			expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore);
+			expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
+		}
+	});
+
+	test('reduced motion closes immediately without a movement animation', async ({ page }) => {
+		const requested: string[] = [];
+		await page.emulateMedia({ reducedMotion: 'reduce' });
+		await watchAnimations(page, false);
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await load(page, requested);
+		await trigger(page).click();
+		await expect(dialog(page)).toBeVisible();
+		await settled(page);
+		const before = await page.evaluate(
+			() => (window as unknown as { __anims: Animation[] }).__anims.length
+		);
+		await page.keyboard.press('Escape');
+		await expect(dialog(page)).toBeHidden();
+		expect(
+			await page.evaluate(() => (window as unknown as { __anims: Animation[] }).__anims.length)
+		).toBe(before);
+		await expect(trigger(page)).toBeFocused();
 	});
 
 	test('reduced motion opens without a movement animation', async ({ page }) => {

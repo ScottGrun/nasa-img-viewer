@@ -45,6 +45,10 @@
 					: undefined
 		};
 	};
+	const targetRect = () => {
+		const rect = trigger?.querySelector('img')?.getBoundingClientRect();
+		return rect && { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+	};
 	const closeLightbox = () => {
 		lightbox = null;
 		trigger?.focus();
@@ -108,6 +112,7 @@
 						alt={metadata['EXIF:ImageDescription']}
 						{originalWidth}
 						initial={lightbox}
+						{targetRect}
 						onclose={closeLightbox}
 					/>
 				{/if}
