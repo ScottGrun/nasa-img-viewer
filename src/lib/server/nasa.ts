@@ -3,7 +3,6 @@ const DAY = 60 * 60 * 24;
 export const ASSET_TTL = 30 * DAY;
 export const METADATA_TTL = 30 * DAY;
 export const SEARCH_TTL = DAY;
-export const RELATED_TTL = 7 * DAY;
 
 const REQUEST_TIMEOUT_MS = 10_000;
 

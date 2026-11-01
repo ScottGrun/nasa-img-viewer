@@ -6,7 +6,8 @@
 	import ImageLightbox from '#lib/components/ImageLightbox.svelte';
 	import ImageTag from '#lib/components/ImageTag.svelte';
 	import { twMerge } from 'tailwind-merge';
-	import type { PageData } from './$types';
+	import type { PageData, Snapshot } from './$types';
+	import type { Loaded } from '#lib/components/InfiniteGallery.svelte';
 	import RelatedImageGallery from './RelatedImageGallery.svelte';
 	import { formatExifDate } from '#lib/helpers.js';
 
@@ -26,6 +27,15 @@
 	const originalWidth = $derived(
 		Number(metadata['EXIF:ImageWidth'] ?? metadata['File:ImageWidth'] ?? Number.NaN)
 	);
+
+	// Related images loaded by scrolling. Only applies while it matches this image; restored on Back.
+	let relatedLoaded = $state<Loaded | undefined>(undefined);
+	export const snapshot: Snapshot<Loaded | undefined> = {
+		capture: () => $state.snapshot(relatedLoaded),
+		restore: (value) => {
+			relatedLoaded = value;
+		}
+	};
 
 	let trigger: HTMLButtonElement | undefined = $state(undefined);
 	let lightbox: ComponentProps<typeof ImageLightbox>['initial'] | null = $state(null);
@@ -152,6 +162,15 @@
 	{#await data.related}
 		<p class="mt-6 text-sm text-neutral-600">Loading related images…</p>
 	{:then related}
-		<RelatedImageGallery images={related} class="mt-6" />
+		{#key page.params.nasaId}
+			<RelatedImageGallery
+				nasaId={page.params.nasaId ?? ''}
+				images={related.images}
+				hasMore={related.hasMore}
+				query={related.query}
+				bind:loaded={relatedLoaded}
+				class="mt-6"
+			/>
+		{/key}
 	{/await}
 </div>
