@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	clampLens,
 	clampZoom,
 	defaultZoom,
 	maxZoom,
@@ -9,6 +10,7 @@ import {
 	nativeZoom,
 	nextMinimapCorner,
 	visibleBox,
+	wheelLens,
 	wheelZoom
 } from './magnifier.js';
 
@@ -88,5 +90,23 @@ describe('minimap', () => {
 		// 628 - 130 = 498: touching, so within the margin it stays left
 		expect(nextMinimapCorner('left', at(480), visible, map)).toBe('left');
 		expect(nextMinimapCorner('left', at(460), visible, map)).toBe('right');
+	});
+});
+
+describe('glass size', () => {
+	const big = { w: 1280, h: 800 };
+	it('clamps to 140..520 and the viewport', () => {
+		expect(clampLens(50, big)).toBe(140);
+		expect(clampLens(900, big)).toBe(520);
+		expect(clampLens(300, big)).toBe(300);
+		expect(clampLens(520, { w: 1280, h: 400 })).toBe(368);
+		expect(clampLens(200, { w: 100, h: 100 })).toBe(140);
+	});
+
+	it('resizes multiplicatively', () => {
+		expect(wheelLens(260, -100, big)).toBeCloseTo(260 * Math.exp(0.2));
+		expect(wheelLens(260, 100, big)).toBeLessThan(260);
+		expect(wheelLens(260, -100000, big)).toBe(520);
+		expect(wheelLens(260, 100000, big)).toBe(140);
 	});
 });

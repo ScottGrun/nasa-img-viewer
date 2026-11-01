@@ -119,3 +119,24 @@ export const nextMinimapCorner = (
 	const spot: Box = { ...origin, w: map.w, h: map.h };
 	return circleNearBox(glass, spot, previous === 'right' ? 0 : hysteresis) ? 'left' : 'right';
 };
+
+export const MIN_LENS = 140;
+export const MAX_LENS = 520;
+export const DEFAULT_LENS = 260;
+const LENS_VIEWPORT_MARGIN = 32;
+
+/** Glass diameter limits: 140 to 520px, and always smaller than the viewport's short side. */
+export const clampLens = (diameter: number, viewport: Size) =>
+	Math.max(
+		MIN_LENS,
+		Math.min(
+			MAX_LENS,
+			viewport.w - LENS_VIEWPORT_MARGIN,
+			viewport.h - LENS_VIEWPORT_MARGIN,
+			diameter
+		)
+	);
+
+/** Multiplicative wheel resize: scrolling up (negative deltaY) makes the glass bigger. */
+export const wheelLens = (diameter: number, deltaY: number, viewport: Size) =>
+	clampLens(diameter * Math.exp(-deltaY * WHEEL_SENSITIVITY), viewport);

@@ -1,8 +1,11 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { pickBySize } from '#lib/images.js';
+	import { fade } from 'svelte/transition';
 	import {
+		clampLens,
 		clampZoom,
+		DEFAULT_LENS,
 		defaultZoom,
 		minimapMarker,
 		minimapOrigin,
@@ -10,6 +13,7 @@
 		nativeZoom,
 		nextMinimapCorner,
 		visibleBox,
+		wheelLens,
 		wheelZoom,
 		type MinimapCorner
 	} from '#lib/magnifier.js';
@@ -26,8 +30,14 @@
 
 	type Spot = { x: number; y: number; clientX: number; clientY: number; w: number; h: number };
 
-	const DIAMETER = 260;
-	const RADIUS = DIAMETER / 2;
+	const viewport = () => ({
+		w: document.documentElement.clientWidth,
+		h: document.documentElement.clientHeight
+	});
+	const fadeMs = () =>
+		typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+			? 0
+			: 200;
 
 	interface Connection {
 		saveData?: boolean;
@@ -55,6 +65,8 @@
 	let loadedWidth: number | undefined = $state(undefined);
 	let failed = $state(false);
 	let corner: MinimapCorner = $state('right');
+	/** Glass diameter the user chose; persists until the image changes. */
+	let lens = $state(DEFAULT_LENS);
 	let userZoom: number | undefined = $state(undefined);
 	let displaySrc: string | undefined = $state(undefined);
 	/** Pointer position relative to the image plus the image's size; null hides the glass. */
@@ -88,7 +100,7 @@
 		if (visible) {
 			corner = nextMinimapCorner(
 				corner,
-				{ cx: clientX, cy: clientY, r: RADIUS },
+				{ cx: clientX, cy: clientY, r: clampLens(lens, viewport()) / 2 },
 				visible,
 				minimapSize({ w: rect.width, h: rect.height })
 			);
@@ -139,8 +151,9 @@
 		const onWheel = (event: WheelEvent) => {
 			if (!enabled || spot === null) return;
 			event.preventDefault();
+			if (event.ctrlKey || event.metaKey) lens = wheelLens(lens, event.deltaY, viewport());
+			else userZoom = wheelZoom(zoom, event.deltaY, native);
 			track(event.clientX, event.clientY);
-			userZoom = wheelZoom(zoom, event.deltaY, native);
 		};
 		el.addEventListener('wheel', onWheel, { passive: false });
 		return () => el.removeEventListener('wheel', onWheel);
@@ -180,10 +193,32 @@
 	{@render children()}
 </button>
 
+{#if spot}
+	{@const hintBox = visibleBox(
+		{ left: spot.clientX - spot.x, top: spot.clientY - spot.y, w: spot.w, h: spot.h },
+		viewport()
+	)}
+	{#if hintBox}
+		<div
+			aria-hidden="true"
+			data-testid="magnifier-hint"
+			transition:fade={{ duration: fadeMs() }}
+			class="pointer-events-none fixed top-0 left-0 z-30 rounded-full bg-black/55 px-3 py-1 text-xs whitespace-nowrap text-white/90"
+			style="transform:translate({hintBox.left + 12}px,{hintBox.top + 12}px)"
+		>
+			{enabled
+				? 'Scroll to zoom · Ctrl + scroll to resize · Click to turn off'
+				: 'Click to turn on magnifier'}
+		</div>
+	{/if}
+{/if}
+
 {#if active && spot}
+	{@const diameter = clampLens(lens, viewport())}
+	{@const radius = diameter / 2}
 	{@const display = { w: spot.w, h: spot.h }}
 	{@const map = minimapSize(display)}
-	{@const marker = minimapMarker(spot, display, zoom, DIAMETER, map)}
+	{@const marker = minimapMarker(spot, display, zoom, diameter, map)}
 	{@const visible = visibleBox(
 		{ left: spot.clientX - spot.x, top: spot.clientY - spot.y, w: spot.w, h: spot.h },
 		{ w: document.documentElement.clientWidth, h: document.documentElement.clientHeight }
@@ -210,16 +245,16 @@
 		aria-hidden="true"
 		data-testid="magnifier-glass"
 		class="pointer-events-none fixed top-0 left-0 z-50 overflow-hidden rounded-full border-4 border-white bg-neutral-50 shadow-xl ring-1 ring-black/20"
-		style="width:{DIAMETER}px;height:{DIAMETER}px;transform:translate({spot.clientX -
-			RADIUS}px,{spot.clientY - RADIUS}px)"
+		style="width:{diameter}px;height:{diameter}px;transform:translate({spot.clientX -
+			radius}px,{spot.clientY - radius}px)"
 	>
 		{#if shown}
 			<img
 				src={shown}
 				alt=""
 				class="absolute top-0 left-0 max-w-none select-none"
-				style="width:{spot.w * zoom}px;height:{spot.h * zoom}px;transform:translate({RADIUS -
-					spot.x * zoom}px,{RADIUS - spot.y * zoom}px)"
+				style="width:{spot.w * zoom}px;height:{spot.h * zoom}px;transform:translate({radius -
+					spot.x * zoom}px,{radius - spot.y * zoom}px)"
 			/>
 		{/if}
 		{#if loading}

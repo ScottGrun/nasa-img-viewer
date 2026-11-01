@@ -525,6 +525,84 @@ test.describe('image magnifier', () => {
 		expect(requested.filter((u) => u.includes('~orig')).length).toBeLessThanOrEqual(1);
 	});
 
+	test('ctrl+wheel resizes the glass, plain wheel zooms it, and a hint explains', async ({
+		page
+	}) => {
+		test.setTimeout(60_000);
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await page.goto(DETAIL);
+		await expect(page.locator('main picture img').first()).toBeAttached();
+		await page.waitForLoadState('networkidle');
+		const hint = page.getByTestId('magnifier-hint');
+		await expect(hint).toBeHidden();
+		const box = (await target(page).boundingBox())!;
+		const cx = box.x + box.width * 0.5;
+		const cy = box.y + box.height * 0.5;
+		await page.mouse.move(cx - 3, cy);
+		await page.mouse.move(cx, cy);
+		await expect(glass(page)).toBeVisible();
+		await expect(hint).toHaveText('Scroll to zoom · Ctrl + scroll to resize · Click to turn off');
+
+		const glassWidth = async () => (await glass(page).boundingBox())!.width;
+		const innerWidth = () => glassImg(page).evaluate((el) => el.getBoundingClientRect().width);
+		const resize = async (deltaY: number) => {
+			await page.keyboard.down('Control');
+			await page.mouse.wheel(0, deltaY);
+			await page.keyboard.up('Control');
+		};
+
+		expect(await glassWidth()).toBeCloseTo(260, 0);
+		const inner0 = await innerWidth();
+		await resize(-200);
+		await expect.poll(glassWidth).toBeGreaterThan(260);
+		expect(await innerWidth()).toBeCloseTo(inner0, 0);
+		expect(await page.evaluate(() => window.scrollY)).toBe(0);
+		// Still centred on the cursor.
+		const g = (await glass(page).boundingBox())!;
+		expect(Math.abs(g.x + g.width / 2 - cx)).toBeLessThanOrEqual(1);
+		expect(Math.abs(g.y + g.height / 2 - cy)).toBeLessThanOrEqual(1);
+
+		// Plain wheel zooms and leaves the size alone.
+		const size = await glassWidth();
+		await page.mouse.wheel(0, -200);
+		await expect.poll(innerWidth).toBeGreaterThan(inner0);
+		expect(await glassWidth()).toBeCloseTo(size, 0);
+
+		// Limits.
+		for (let i = 0; i < 6; i++) await resize(-2000);
+		await expect.poll(glassWidth).toBeCloseTo(520, 0);
+		// The minimap keeps clear of the (now larger) glass.
+		const gl = (await glass(page).boundingBox())!;
+		const mm = (await page.getByTestId('magnifier-minimap').boundingBox())!;
+		const gcx = gl.x + gl.width / 2;
+		const gcy = gl.y + gl.height / 2;
+		const nx = Math.min(mm.x + mm.width, Math.max(mm.x, gcx));
+		const ny = Math.min(mm.y + mm.height, Math.max(mm.y, gcy));
+		expect(Math.hypot(gcx - nx, gcy - ny)).toBeGreaterThanOrEqual(gl.width / 2);
+		for (let i = 0; i < 6; i++) await resize(2000);
+		await expect.poll(glassWidth).toBeCloseTo(140, 0);
+		await resize(-200);
+		await page.screenshot({ path: 'test-results/lens-resized.png' });
+
+		// The size survives leaving, re-entering and toggling.
+		const kept = await glassWidth();
+		await target(page).dispatchEvent('pointerleave', { pointerType: 'mouse' });
+		await expect(glass(page)).toBeHidden();
+		await expect(hint).toBeHidden();
+		await page.mouse.move(cx + 3, cy);
+		await expect(glass(page)).toBeVisible();
+		expect(await glassWidth()).toBeCloseTo(kept, 0);
+
+		// Click: the hint changes to the off text.
+		await target(page).click();
+		await expect(glass(page)).toBeHidden();
+		await expect(hint).toHaveText('Click to turn on magnifier');
+		await target(page).click();
+		await page.mouse.move(cx, cy);
+		await expect(glass(page)).toBeVisible();
+		expect(await glassWidth()).toBeCloseTo(kept, 0);
+	});
+
 	test.describe('touch', () => {
 		test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
@@ -537,6 +615,7 @@ test.describe('image magnifier', () => {
 			await page.waitForTimeout(500);
 			await expect(glass(page)).toHaveCount(0);
 			await expect(page.getByTestId('magnifier-minimap')).toHaveCount(0);
+			await expect(page.getByTestId('magnifier-hint')).toHaveCount(0);
 			expect(requested.filter((u) => u.includes('~orig'))).toEqual([]);
 		});
 	});
