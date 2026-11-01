@@ -1,15 +1,17 @@
 import prettier from 'eslint-config-prettier';
 import js from '@eslint/js';
+import { defineConfig, globalIgnores } from 'eslint/config';
 import svelte from 'eslint-plugin-svelte';
 import globals from 'globals';
 import ts from 'typescript-eslint';
 
-export default ts.config(
+export default defineConfig(
+	globalIgnores(['build/', '.svelte-kit/', 'dist/', 'test-results/', 'playwright-report/']),
 	js.configs.recommended,
-	...ts.configs.recommended,
-	...svelte.configs['flat/recommended'],
+	ts.configs.recommended,
+	svelte.configs.recommended,
 	prettier,
-	...svelte.configs['flat/prettier'],
+	svelte.configs.prettier,
 	{
 		languageOptions: {
 			globals: {
@@ -19,15 +21,12 @@ export default ts.config(
 		}
 	},
 	{
-		files: ['**/*.svelte'],
+		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
 
 		languageOptions: {
 			parserOptions: {
 				parser: ts.parser
 			}
 		}
-	},
-	{
-		ignores: ['build/', '.svelte-kit/', 'dist/']
 	}
 );
