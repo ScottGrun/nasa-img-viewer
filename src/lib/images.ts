@@ -82,3 +82,11 @@ export const toGalleryImage = (item: SearchResultItem): GalleryImage | undefined
 
 export const toGalleryImages = (items: SearchResultItem[] = []): GalleryImage[] =>
 	items.map(toGalleryImage).filter((image): image is GalleryImage => image !== undefined);
+
+/** Drops images already in `seen` (and repeats within `images`), adding the kept ids to `seen`. */
+export const dedupeImages = (images: GalleryImage[], seen: Set<string>): GalleryImage[] =>
+	images.filter((image) => {
+		if (seen.has(image.nasaId)) return false;
+		seen.add(image.nasaId);
+		return true;
+	});

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const imageLinks = (page: Page) => page.locator('main a[href^="/image/"]');
 
@@ -114,4 +114,120 @@ test('Inter and DM Mono web fonts load', async ({ page }) => {
 	expect(Object.values(fontStatuses).every((s) => s === 200)).toBe(true);
 	expect(await page.evaluate(() => document.fonts.check("16px 'Inter Variable'"))).toBe(true);
 	expect(await page.evaluate(() => document.fonts.check("16px 'DM Mono'"))).toBe(true);
+});
+
+const SUFFIX = ' | NASA Image Viewer';
+const noMore = (page: Page) => page.getByText('No more images');
+const markNavigation = (page: Page) =>
+	page.evaluate(() => {
+		(window as unknown as { __marker: number }).__marker = 1;
+	});
+const marker = (page: Page) =>
+	page.evaluate(() => (window as unknown as { __marker?: number }).__marker);
+
+const position = (link: Locator) =>
+	link.evaluate((el) => {
+		const r = el.getBoundingClientRect();
+		return { x: r.x, y: r.y + window.scrollY };
+	});
+
+const scrollUntilMoreThan = async (page: Page, count: number) => {
+	await expect
+		.poll(
+			async () => {
+				await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+				return imageLinks(page).count();
+			},
+			{ timeout: 30_000 }
+		)
+		.toBeGreaterThan(count);
+};
+
+test('keyword tag shows the real apostrophe and links to results', async ({ page }) => {
+	await page.goto(DETAIL);
+	const tag = page.locator('a[href^="/?keywords="]', { hasText: 'NASA’s Armstrong' }).first();
+	await expect(tag).toBeVisible();
+	await tag.click();
+	await expect(page).toHaveURL(/\?keywords=/);
+	await expect(imageLinks(page).first()).toBeAttached();
+});
+
+test('infinite scroll appends images without duplicates or moving earlier ones', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1280, height: 800 });
+	await page.goto('/?q=Apollo');
+	await expect(imageLinks(page)).toHaveCount(48);
+	const first = imageLinks(page).first();
+	const firstHref = await first.getAttribute('href');
+	const before = await position(first);
+
+	await scrollUntilMoreThan(page, 48);
+	const ids = (await hrefs(page)) as string[];
+	expect(new Set(ids).size).toBe(ids.length);
+	expect(ids[0]).toBe(firstHref);
+	expect(await position(first)).toEqual(before);
+});
+
+test('shows "No more images" at the end of a short result set', async ({ page }) => {
+	await page.goto('/?nasa_id=PIA04928');
+	await expect(imageLinks(page)).toHaveCount(1);
+	await expect(noMore(page)).toBeVisible();
+});
+
+test('shows an empty state for a search with no results', async ({ page }) => {
+	await page.goto('/?q=zzzqqqxxnotreal');
+	await expect(page.getByText('No images found for "zzzqqqxxnotreal"')).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Back to home' })).toBeVisible();
+	await expect(noMore(page)).toHaveCount(0);
+});
+
+test('opening an image is a client-side navigation', async ({ page }) => {
+	await page.goto('/?q=Apollo');
+	await expect(imageLinks(page).first()).toBeAttached();
+	await markNavigation(page);
+	await imageLinks(page).first().click({ force: true });
+	await expect(page).toHaveURL(/\/image\//);
+	await expect(page.locator('h1')).not.toBeEmpty();
+	expect(await marker(page)).toBe(1);
+});
+
+test('search form submits via client navigation and updates results', async ({ page }) => {
+	await page.goto('/');
+	await expect(imageLinks(page).first()).toBeAttached();
+	const before = JSON.stringify(await hrefs(page));
+	await markNavigation(page);
+	await page.getByLabel('Search for images').fill('Gemini');
+	await page.getByLabel('Search for images').press('Enter');
+	await expect(page).toHaveURL(/\?q=Gemini/);
+	await expect.poll(async () => JSON.stringify(await hrefs(page))).not.toBe(before);
+	expect(await marker(page)).toBe(1);
+	await expect(page.getByLabel('Search for images')).toHaveValue('Gemini');
+});
+
+test('going back keeps images loaded by scrolling', async ({ page }) => {
+	await page.setViewportSize({ width: 1280, height: 800 });
+	await page.goto('/?q=Apollo');
+	await expect(imageLinks(page)).toHaveCount(48);
+	await scrollUntilMoreThan(page, 48);
+	const loaded = (await hrefs(page)) as string[];
+
+	await imageLinks(page).first().click({ force: true });
+	await expect(page.locator('h1')).not.toBeEmpty();
+	await page.goBack();
+	await expect(page).toHaveURL(/\?q=Apollo/);
+	await expect.poll(() => imageLinks(page).count()).toBeGreaterThanOrEqual(loaded.length);
+	expect(((await hrefs(page)) as string[]).slice(0, loaded.length)).toEqual(loaded);
+});
+
+test('page titles', async ({ page }) => {
+	await page.goto('/');
+	await expect(page).toHaveTitle('NASA Image Viewer');
+	await page.goto('/?q=Apollo');
+	await expect(page).toHaveTitle(`Apollo${SUFFIX}`);
+	await page.goto(DETAIL);
+	const h1 = (await page.locator('h1').innerText()).trim();
+	await expect(page).toHaveTitle(`${h1}${SUFFIX}`);
+	await page.goto('/image/doesnotexist123');
+	await expect(page).toHaveTitle(`404${SUFFIX}`);
 });
