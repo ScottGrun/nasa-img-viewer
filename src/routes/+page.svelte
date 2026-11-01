@@ -213,9 +213,7 @@
 			>
 		</div>
 	{:else}
-		{#each current.batches as batch, i (i)}
-			<Masonary images={batch} />
-		{/each}
+		<Masonary images={current.batches.flat()} />
 		<div bind:this={sentinel} aria-hidden="true"></div>
 		<div class="py-6 text-center text-xs text-neutral-500">
 			{#if failed}

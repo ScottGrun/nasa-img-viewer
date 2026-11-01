@@ -217,7 +217,7 @@ test('going back keeps images loaded by scrolling', async ({ page }) => {
 	await page.goBack();
 	await expect(page).toHaveURL(/\?q=Apollo/);
 	await expect.poll(() => imageLinks(page).count()).toBeGreaterThanOrEqual(loaded.length);
-	expect(((await hrefs(page)) as string[]).slice(0, loaded.length)).toEqual(loaded);
+	expect((await hrefs(page)) as string[]).toEqual(expect.arrayContaining(loaded));
 });
 
 test('page titles', async ({ page }) => {
@@ -230,4 +230,33 @@ test('page titles', async ({ page }) => {
 	await expect(page).toHaveTitle(`${h1}${SUFFIX}`);
 	await page.goto('/image/doesnotexist123');
 	await expect(page).toHaveTitle(`404${SUFFIX}`);
+});
+
+test('gallery columns stay balanced across loaded batches', async ({ page }) => {
+	await page.setViewportSize({ width: 1280, height: 800 });
+	await page.goto('/?q=Apollo');
+	const links = page.locator('main a[href*="image/"]');
+	await expect(links).toHaveCount(48);
+	await expect
+		.poll(
+			async () => {
+				await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+				return links.count();
+			},
+			{ timeout: 20_000 }
+		)
+		.toBeGreaterThan(48);
+
+	const layout = await page.evaluate(() => {
+		const columns = [...document.querySelectorAll('[data-masonary-column]')];
+		const bottoms = columns.map((c) => c.getBoundingClientRect().bottom);
+		const tallest = Math.max(
+			...[...document.querySelectorAll('[data-masonary-column] > *')].map(
+				(el) => el.getBoundingClientRect().height
+			)
+		);
+		return { count: columns.length, spread: Math.max(...bottoms) - Math.min(...bottoms), tallest };
+	});
+	expect(layout.count).toBe(3);
+	expect(layout.spread).toBeLessThanOrEqual(layout.tallest + 8);
 });
