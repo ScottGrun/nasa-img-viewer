@@ -9,6 +9,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { twMerge } from 'tailwind-merge';
+	import { preloadOnIntent } from '#lib/preload.js';
 	import Image from '../Image.svelte';
 
 	const {
@@ -19,8 +20,20 @@
 		description,
 		nasaId,
 		title,
+		preview,
 		class: className
 	}: MasonaryImageProps = $props();
+
+	// Mouse hover or keyboard focus only: touch events also fire while scrolling
+	let cancelPreload: (() => void) | undefined;
+	const startPreload = () => {
+		cancelPreload?.();
+		cancelPreload = preloadOnIntent(preview);
+	};
+	const stopPreload = () => {
+		cancelPreload?.();
+		cancelPreload = undefined;
+	};
 </script>
 
 <div class={twMerge('relative w-fit overflow-hidden rounded-md', className)}>
@@ -40,8 +53,14 @@
 	<div
 		class="group absolute bottom-0 z-10 flex h-full w-full flex-col bg-masonary-image-gradient p-5 font-semibold text-white opacity-0 transition-opacity duration-300 hover:opacity-100"
 	>
-		<a href={resolve('/image/[nasaId]', { nasaId })} id={nasaId} class="mt-auto text-sm font-bold"
-			>{title}</a
+		<a
+			href={resolve('/image/[nasaId]', { nasaId })}
+			id={nasaId}
+			class="mt-auto text-sm font-bold"
+			onpointerenter={(e) => e.pointerType === 'mouse' && startPreload()}
+			onpointerleave={stopPreload}
+			onfocus={(e) => e.currentTarget.matches(':focus-visible') && startPreload()}
+			onblur={stopPreload}>{title}</a
 		>
 		<p class="mt-1 line-clamp-3 text-xs font-normal" aria-hidden="true">
 			{description}

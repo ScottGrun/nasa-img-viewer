@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { HTMLImgAttributes } from 'svelte/elements';
 	import { twMerge } from 'tailwind-merge';
-	import { pickBySize } from '#lib/images.js';
+	import { pickPreviewSources } from '#lib/images.js';
 	import type { AssetManifestItem } from '#lib/types.js';
 
 	interface Props extends Omit<HTMLImgAttributes, 'class'> {
@@ -25,8 +25,9 @@
 
 	// Asset manifest: large on wide screens, medium otherwise. ~orig is only a last resort.
 	const hrefs = $derived((images ?? []).map((img) => img.href));
-	const large = $derived(pickBySize(hrefs, ['large', 'medium', 'small', 'thumb']));
-	const medium = $derived(pickBySize(hrefs, ['medium', 'large', 'small', 'thumb']));
+	const sources = $derived(pickPreviewSources(hrefs));
+	const large = $derived(sources.large);
+	const medium = $derived(sources.medium);
 </script>
 
 <div

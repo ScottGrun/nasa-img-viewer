@@ -260,3 +260,109 @@ test('gallery columns stay balanced across loaded batches', async ({ page }) => 
 	expect(layout.count).toBe(3);
 	expect(layout.spread).toBeLessThanOrEqual(layout.tallest + 8);
 });
+
+test('detail data streams: title first, related images in a later chunk', async ({ page }) => {
+	await page.goto('/');
+	const body = await page.evaluate(async (url) => {
+		const res = await fetch(url);
+		const reader = res.body!.getReader();
+		const decoder = new TextDecoder();
+		const parts: string[] = [];
+		for (;;) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			parts.push(decoder.decode(value, { stream: true }));
+		}
+		return parts.join('');
+	}, `${DETAIL}/__data.json`);
+
+	const lines = body.split('\n').filter(Boolean);
+	// The first line is the page data with `related` still a pending promise reference
+	expect(lines[0]).toContain('"type":"data"');
+	expect(lines[0]).toContain('"AVAIL:Title"');
+	expect(lines[0]).toContain('["Promise"');
+	expect(lines[0]).not.toContain('"preview"');
+	// Related images arrive in a separate, later chunk
+	const later = lines.slice(1).find((line) => line.includes('"type":"chunk"'));
+	expect(later).toContain('"preview"');
+});
+
+const SEARCH = '/?q=Apollo';
+const isLarge = (url: string) => /~large\./.test(url);
+
+test.describe('hover preload (desktop)', () => {
+	test.use({ viewport: { width: 1280, height: 800 } });
+
+	test('hovering a card preloads the exact image the detail page then uses', async ({ page }) => {
+		const requests: string[] = [];
+		page.on('request', (req) => requests.push(req.url()));
+		await page.goto(SEARCH);
+		const card = imageLinks(page).first();
+		await expect(card).toBeAttached();
+		await card.hover({ force: true });
+		const preloaded = (await page.waitForRequest((req) => isLarge(req.url()))).url();
+
+		await card.click({ force: true });
+		await expect(page.locator('h1')).not.toBeEmpty();
+		const img = page.locator('main picture img').first();
+		await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.currentSrc)).toBe(preloaded);
+		// NASA sends max-age=300, so the detail page reuses the preloaded response
+		expect(requests.filter((u) => u === preloaded)).toHaveLength(1);
+	});
+
+	test('sweeping the mouse across a card does not preload', async ({ page }) => {
+		const requests: string[] = [];
+		page.on('request', (req) => requests.push(req.url()));
+		await page.goto(SEARCH);
+		const card = imageLinks(page).first();
+		await expect(card).toBeAttached();
+		await page.waitForLoadState('networkidle');
+		const box = (await card.boundingBox())!;
+		await page.mouse.move(box.x - 20, box.y + box.height / 2);
+		await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+		await page.mouse.move(box.x + box.width + 20, box.y + box.height / 2);
+		await page.waitForTimeout(500);
+		expect(requests.filter(isLarge)).toEqual([]);
+	});
+});
+
+test.describe('hover preload (phone)', () => {
+	test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+	test('scrolling and tapping does not preload', async ({ page }) => {
+		const requests: string[] = [];
+		page.on('request', (req) => requests.push(req.url()));
+		await page.addInitScript(() => {
+			const w = window as unknown as { __imageCtors: number };
+			w.__imageCtors = 0;
+			const Native = window.Image;
+			window.Image = class extends Native {
+				constructor(...args: ConstructorParameters<typeof Native>) {
+					super(...args);
+					w.__imageCtors++;
+				}
+			} as typeof Image;
+		});
+		await page.goto(SEARCH);
+		await expect(imageLinks(page).first()).toBeAttached();
+		await page.waitForLoadState('networkidle');
+
+		const cdp = await page.context().newCDPSession(page);
+		const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', y: number) =>
+			cdp.send('Input.dispatchTouchEvent', {
+				type,
+				touchPoints: type === 'touchEnd' ? [] : [{ x: 200, y }]
+			});
+		await touch('touchStart', 600);
+		await touch('touchMove', 400);
+		await touch('touchMove', 200);
+		await touch('touchEnd', 200);
+		await page.touchscreen.tap(200, 300);
+		await page.waitForTimeout(500);
+
+		expect(
+			await page.evaluate(() => (window as unknown as { __imageCtors: number }).__imageCtors)
+		).toBe(0);
+		expect(requests.filter(isLarge)).toEqual([]);
+	});
+});
