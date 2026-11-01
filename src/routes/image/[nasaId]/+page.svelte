@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import Image from '#lib/components/Image.svelte';
+	import ImageMagnifier from '#lib/components/ImageMagnifier.svelte';
 	import ImageTag from '#lib/components/ImageTag.svelte';
 	import { twMerge } from 'tailwind-merge';
 	import type { PageData } from './$types';
@@ -19,6 +20,10 @@
 	const width = $derived(Number(metadata['EXIF:ImageWidth'] ?? metadata['File:ImageWidth'] ?? 16));
 	const height = $derived(
 		Number(metadata['EXIF:ImageHeight'] ?? metadata['File:ImageHeight'] ?? 9)
+	);
+
+	const originalWidth = $derived(
+		Number(metadata['EXIF:ImageWidth'] ?? metadata['File:ImageWidth'] ?? Number.NaN)
 	);
 
 	const photographer = $derived(metadata['AVAIL:Photographer']);
@@ -57,14 +62,16 @@
 	<main class={twMerge('grid gap-4', 'lg:grid-cols-[1fr_400px]')}>
 		<div>
 			{#key page.params.nasaId}
-				<Image
-					images={asset.items}
-					alt={metadata['EXIF:ImageDescription']}
-					class="mx-auto  block rounded-lg"
-					loading="eager"
-					fetchpriority="high"
-					aspectRatio={width / height}
-				/>
+				<ImageMagnifier images={asset.items} {originalWidth}>
+					<Image
+						images={asset.items}
+						alt={metadata['EXIF:ImageDescription']}
+						class="mx-auto  block rounded-lg"
+						loading="eager"
+						fetchpriority="high"
+						aspectRatio={width / height}
+					/>
+				</ImageMagnifier>
 			{/key}
 		</div>
 

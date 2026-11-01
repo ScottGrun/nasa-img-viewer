@@ -366,3 +366,93 @@ test.describe('hover preload (phone)', () => {
 		expect(requests.filter(isLarge)).toEqual([]);
 	});
 });
+
+test.describe('image magnifier', () => {
+	const glass = (page: Page) => page.getByTestId('magnifier-glass');
+	const glassImg = (page: Page) => glass(page).locator('img');
+	const target = (page: Page) => page.getByRole('button', { name: 'Toggle image magnifier' });
+
+	test('shows a glass on hover, loads the original, zooms and toggles', async ({ page }) => {
+		test.setTimeout(120_000);
+		const requested: string[] = [];
+		page.on('request', (req) => requested.push(req.url()));
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await page.goto(DETAIL);
+		await expect(page.locator('main picture img').first()).toBeAttached();
+		await page.waitForLoadState('networkidle');
+		expect(requested.filter((u) => u.includes('~orig'))).toEqual([]);
+
+		const box = (await target(page).boundingBox())!;
+		await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+		await page.mouse.move(box.x + box.width * 0.5 + 5, box.y + box.height * 0.5 + 5);
+		await expect(glass(page)).toBeVisible();
+		await expect.poll(() => requested.some((u) => u.includes('~orig'))).toBe(true);
+		await expect
+			.poll(() => glassImg(page).evaluate((el: HTMLImageElement) => el.currentSrc), {
+				timeout: 90_000
+			})
+			.toContain('~orig');
+
+		// Moving the mouse moves the glass and the image inside it.
+		const before = {
+			glass: (await glass(page).boundingBox())!,
+			inner: await glassImg(page).evaluate((el) => getComputedStyle(el).transform)
+		};
+		await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.4);
+		const after = {
+			glass: (await glass(page).boundingBox())!,
+			inner: await glassImg(page).evaluate((el) => getComputedStyle(el).transform)
+		};
+		expect(after.glass.x).not.toBe(before.glass.x);
+		expect(after.inner).not.toBe(before.inner);
+
+		// Wheel zooms the glass and does not scroll the page; zoom is bounded.
+		const innerWidth = () => glassImg(page).evaluate((el) => el.getBoundingClientRect().width);
+		const w0 = await innerWidth();
+		await page.mouse.wheel(0, -200);
+		await expect.poll(innerWidth).toBeGreaterThan(w0);
+		expect(await page.evaluate(() => window.scrollY)).toBe(0);
+		for (let i = 0; i < 12; i++) await page.mouse.wheel(0, -1000);
+		await expect.poll(innerWidth).toBeGreaterThan(w0);
+		const wMax = await innerWidth();
+		await page.mouse.wheel(0, -1000);
+		await page.waitForTimeout(100);
+		expect(await innerWidth()).toBe(wMax);
+		expect(wMax / box.width).toBeLessThanOrEqual(16 + 0.01);
+		expect(await page.evaluate(() => window.scrollY)).toBe(0);
+
+		// Click turns the glass off, shows a zoom-in cursor and lets the wheel scroll.
+		await target(page).click();
+		await expect(glass(page)).toBeHidden();
+		await expect(target(page)).toHaveAttribute('aria-pressed', 'false');
+		expect(await target(page).evaluate((el) => getComputedStyle(el).cursor)).toBe('zoom-in');
+		await page.mouse.wheel(0, 300);
+		await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
+		// Click again (scrolled back first) brings it back.
+		await page.evaluate(() => window.scrollTo(0, 0));
+		await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+		await target(page).click();
+		await page.mouse.move(box.x + box.width * 0.5 + 3, box.y + box.height * 0.5);
+		await expect(glass(page)).toBeVisible();
+
+		// Leaving the image hides it.
+		await target(page).dispatchEvent('pointerleave', { pointerType: 'mouse' });
+		await expect(glass(page)).toBeHidden();
+	});
+
+	test.describe('touch', () => {
+		test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+		test('tapping shows no glass and downloads no original', async ({ page }) => {
+			const requested: string[] = [];
+			page.on('request', (req) => requested.push(req.url()));
+			await page.goto(DETAIL);
+			await expect(page.locator('main picture img').first()).toBeAttached();
+			await target(page).tap();
+			await page.waitForTimeout(500);
+			await expect(glass(page)).toHaveCount(0);
+			expect(requested.filter((u) => u.includes('~orig'))).toEqual([]);
+		});
+	});
+});
