@@ -172,6 +172,43 @@ test('infinite scroll appends images without duplicates or moving earlier ones',
 	expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(1);
 });
 
+test('related images load more on scroll, without duplicates or the current image', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1280, height: 800 });
+	const requests: string[] = [];
+	page.on('request', (req) => {
+		if (req.url().includes('/api/search')) requests.push(new URL(req.url()).search);
+	});
+	await page.goto(DETAIL);
+	const related = page.locator('section:has(h2:text("Related images")) a[href^="/image/"]');
+	await expect(related.first()).toBeAttached();
+	const firstCount = await related.count();
+	expect(firstCount).toBeGreaterThan(12);
+
+	await expect
+		.poll(async () => {
+			await page.mouse.wheel(0, 3000);
+			return related.count();
+		})
+		.toBeGreaterThan(firstCount);
+	const ids = await related.evaluateAll((els) => els.map((e) => e.getAttribute('href')));
+	expect(new Set(ids).size).toBe(ids.length);
+	expect(ids).not.toContain(DETAIL);
+
+	// Every page asks for the same keywords, starting at page 2
+	expect(requests.length).toBeGreaterThan(0);
+	const keywords = new Set(requests.map((r) => new URLSearchParams(r).get('keywords')));
+	expect(keywords.size).toBe(1);
+	expect(new URLSearchParams(requests[0]).get('page')).toBe('2');
+
+	// Going to another image starts the gallery over
+	await related.nth(2).click({ force: true });
+	await expect(page).not.toHaveURL(new RegExp(`${DETAIL}$`));
+	await expect(related.first()).toBeAttached();
+	await expect.poll(() => related.count()).toBeLessThanOrEqual(48);
+});
+
 test('shows "No more images" at the end of a short result set', async ({ page }) => {
 	await page.goto('/?nasa_id=PIA04928');
 	await expect(imageLinks(page)).toHaveCount(1);
@@ -1058,6 +1095,33 @@ test.describe('date range slider', () => {
 		await earliest(page).fill('2020');
 		expect(await values(page)).toEqual(['2000', '2000']);
 	});
+
+	for (const direction of ['left', 'right'] as const) {
+		test(`thumbs on the same mid-range year can be dragged apart to the ${direction}`, async ({
+			page
+		}) => {
+			await page.goto('/?q=Apollo&year_start=1990&year_end=1990');
+			const box = await slider(page).locator('div.range').boundingBox();
+			if (!box) throw new Error('no slider box');
+			const y = box.y + box.height / 2;
+			const x = box.x + 12 + ((1990 - 1920) / (YEAR - 1920)) * (box.width - 24);
+			await page.mouse.move(x, y);
+			await page.mouse.down();
+			await page.mouse.move(direction === 'left' ? x - 80 : x + 80, y, { steps: 12 });
+			await page.mouse.up();
+			await expect(page).toHaveURL(
+				direction === 'left' ? /year_start=19[0-8]\d/ : /year_end=(199[1-9]|20[0-9][0-9])/
+			);
+			const [from, to] = (await values(page)).map(Number);
+			if (direction === 'left') {
+				expect(from).toBeLessThan(1990);
+				expect(to).toBe(1990);
+			} else {
+				expect(from).toBe(1990);
+				expect(to).toBeGreaterThan(1990);
+			}
+		});
+	}
 
 	test('Reset removes both params and is hidden by default', async ({ page }) => {
 		await page.goto('/?q=Apollo');

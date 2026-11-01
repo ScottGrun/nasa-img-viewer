@@ -32,23 +32,43 @@
 	let root: HTMLElement | undefined = $state(undefined);
 
 	// Labels follow the thumbs live; the page only navigates on release (`change`)
+	// When both thumbs share a year, only the top one can be grabbed. Which one the user means
+	// is decided by the direction of the first move, so either can be dragged apart.
+	let tied = false;
+	let moving: 'low' | 'high' | undefined;
+	const press = () => {
+		tied = low === high;
+		moving = undefined;
+	};
 	const onLow = (event: Event & { currentTarget: HTMLInputElement }) => {
-		low = Math.min(Number(event.currentTarget.value), high);
+		const value = Number(event.currentTarget.value);
+		if (tied && !moving && value !== low) moving = value > high ? 'high' : 'low';
+		if (moving === 'high') high = Math.max(value, low);
+		else low = Math.min(value, high);
 		event.currentTarget.value = String(low);
 	};
 	const onHigh = (event: Event & { currentTarget: HTMLInputElement }) => {
-		high = Math.max(Number(event.currentTarget.value), low);
+		const value = Number(event.currentTarget.value);
+		if (tied && !moving && value !== high) moving = value < low ? 'low' : 'high';
+		if (moving === 'low') low = Math.min(value, high);
+		else high = Math.max(value, low);
 		event.currentTarget.value = String(high);
 	};
 
+	// Releasing a thumb can fire both `pointerup` and `change`; only the first may navigate
+	let requested = '';
 	const commit = async () => {
-		if (low === committed.start && high === committed.end) return;
+		tied = false;
+		const wanted = `${low}-${high}`;
+		if ((low === committed.start && high === committed.end) || wanted === requested) return;
+		requested = wanted;
 		const pastSlider = (root?.getBoundingClientRect().bottom ?? 0) < 0;
 		const search = rangeToSearch(page.url.searchParams, { start: low, end: high }, maxYear);
 		await goto(search ? resolve(`/?${search}`) : resolve('/'), {
 			replaceState: true,
 			reset: false
 		});
+		requested = '';
 		if (pastSlider) root?.scrollIntoView({ block: 'start' });
 	};
 </script>
@@ -75,6 +95,8 @@
 			step="1"
 			value={low}
 			class:on-top={lowOnTop}
+			onpointerdown={press}
+			onpointerup={commit}
 			oninput={onLow}
 			onchange={commit}
 		/>
@@ -85,6 +107,8 @@
 			max={maxYear}
 			step="1"
 			value={high}
+			onpointerdown={press}
+			onpointerup={commit}
 			oninput={onHigh}
 			onchange={commit}
 		/>
