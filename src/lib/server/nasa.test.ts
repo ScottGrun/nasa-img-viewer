@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NasaError, nasaJson } from './nasa.js';
 
 const makeCache = (stored = new Map<string, Response>()) => ({
@@ -10,20 +10,22 @@ const jsonResponse = (body: unknown, status = 200) =>
 	new Response(JSON.stringify(body), { status });
 const url = 'https://images-api.nasa.gov/search?q=moon';
 
+const useCache = (cache: unknown) => vi.stubGlobal('caches', { default: cache });
+
 describe('nasaJson', () => {
+	afterEach(() => vi.unstubAllGlobals());
+
 	it('fetches on a miss and stores the response', async () => {
 		const cache = makeCache();
-		const waitUntil = vi.fn();
+		useCache(cache);
 		const fetcher = vi.fn(async () => jsonResponse({ a: 1 }));
 		const data = await nasaJson(url, {
 			ttlSeconds: 60,
-			platform: { caches: { default: cache }, context: { waitUntil } },
 			fetch: fetcher
 		});
 		expect(data).toEqual({ a: 1 });
 		expect(fetcher).toHaveBeenCalledOnce();
 		expect(cache.put).toHaveBeenCalledOnce();
-		expect(waitUntil).toHaveBeenCalledOnce();
 		const stored = cache.stored.get(url)!;
 		expect(stored.headers.get('cache-control')).toBe('public, max-age=60');
 		expect(stored.headers.get('content-type')).toBe('application/json');
@@ -31,10 +33,10 @@ describe('nasaJson', () => {
 
 	it('does not fetch on a hit', async () => {
 		const cache = makeCache(new Map([[url, jsonResponse({ cached: true })]]));
+		useCache(cache);
 		const fetcher = vi.fn();
 		const data = await nasaJson(url, {
 			ttlSeconds: 60,
-			platform: { caches: { default: cache } },
 			fetch: fetcher
 		});
 		expect(data).toEqual({ cached: true });
@@ -43,10 +45,10 @@ describe('nasaJson', () => {
 
 	it('throws NasaError with status and does not store non-OK responses', async () => {
 		const cache = makeCache();
+		useCache(cache);
 		const fetcher = vi.fn(async () => jsonResponse({ reason: 'nope' }, 404));
 		const err = (await nasaJson(url, {
 			ttlSeconds: 60,
-			platform: { caches: { default: cache } },
 			fetch: fetcher
 		}).catch((e: unknown) => e)) as NasaError;
 		expect(err).toBeInstanceOf(NasaError);
@@ -56,14 +58,13 @@ describe('nasaJson', () => {
 
 	it('throws on non-JSON bodies and network failures without storing', async () => {
 		const cache = makeCache();
-		const platform = { caches: { default: cache } };
+		useCache(cache);
 		await expect(
-			nasaJson(url, { ttlSeconds: 1, platform, fetch: async () => new Response('<xml/>') })
+			nasaJson(url, { ttlSeconds: 1, fetch: async () => new Response('<xml/>') })
 		).rejects.toBeInstanceOf(NasaError);
 		await expect(
 			nasaJson(url, {
 				ttlSeconds: 1,
-				platform,
 				fetch: async () => {
 					throw new TypeError('network');
 				}
@@ -81,9 +82,9 @@ describe('nasaJson', () => {
 				throw new Error('boom');
 			})
 		};
+		useCache(cache);
 		const data = await nasaJson(url, {
 			ttlSeconds: 60,
-			platform: { caches: { default: cache }, context: { waitUntil: vi.fn() } },
 			fetch: async () => jsonResponse({ ok: true })
 		});
 		expect(data).toEqual({ ok: true });

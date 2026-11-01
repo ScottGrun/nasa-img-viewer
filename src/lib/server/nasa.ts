@@ -19,9 +19,18 @@ export class NasaError extends Error {
 
 interface NasaJsonOptions {
 	ttlSeconds: number;
-	platform?: App.Platform;
 	fetch?: typeof fetch;
 }
+
+interface EdgeCache {
+	match(request: Request): Promise<Response | undefined>;
+	put(request: Request, response: Response): Promise<void>;
+}
+
+// `caches.default` is a Cloudflare Workers global; it doesn't exist under Node (vite dev, vitest).
+// SvelteKit 3 no longer exposes it on `platform`.
+const getEdgeCache = () =>
+	(globalThis as unknown as { caches?: { default?: EdgeCache } }).caches?.default;
 
 /**
  * Fetches JSON from NASA, backed by the Cloudflare Cache API when available.
@@ -29,9 +38,9 @@ interface NasaJsonOptions {
  */
 export async function nasaJson<T>(
 	url: string,
-	{ ttlSeconds, platform, fetch: fetcher = fetch }: NasaJsonOptions
+	{ ttlSeconds, fetch: fetcher = fetch }: NasaJsonOptions
 ): Promise<T> {
-	const cache = platform?.caches?.default;
+	const cache = getEdgeCache();
 	const key = new Request(url);
 
 	if (cache) {
@@ -68,8 +77,7 @@ export async function nasaJson<T>(
 					'cache-control': `public, max-age=${ttlSeconds}`
 				}
 			});
-			const put = Promise.resolve(cache.put(key, stored)).catch(() => {});
-			platform?.context?.waitUntil(put);
+			await cache.put(key, stored);
 		} catch {
 			// Caching is best effort
 		}

@@ -18,7 +18,7 @@ const SEARCH_PARAMS = [
 	'year_end'
 ];
 
-export const load: PageServerLoad = async ({ url, fetch, platform, setHeaders }) => {
+export const load: PageServerLoad = async ({ url, fetch, setHeaders }) => {
 	const params = new URLSearchParams();
 	for (const name of SEARCH_PARAMS) {
 		const value = url.searchParams.get(name)?.trim();
@@ -31,7 +31,6 @@ export const load: PageServerLoad = async ({ url, fetch, platform, setHeaders })
 	try {
 		data = await nasaJson<SearchResponse>(`https://images-api.nasa.gov/search?${params}`, {
 			ttlSeconds: SEARCH_TTL,
-			platform,
 			fetch
 		});
 	} catch (e) {

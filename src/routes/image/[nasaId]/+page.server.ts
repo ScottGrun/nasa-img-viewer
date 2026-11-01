@@ -7,9 +7,9 @@ import type { PageServerLoad } from './$types';
 const MAX_KEYWORDS = 20;
 const MAX_RELATED = 12;
 
-export const load: PageServerLoad = async ({ params, fetch, platform, setHeaders }) => {
+export const load: PageServerLoad = async ({ params, fetch, setHeaders }) => {
 	const id = encodeURIComponent(params.nasaId);
-	const options = { platform, fetch };
+	const options = { fetch };
 
 	let asset: AssetManifestResponse;
 	let metadata: MetadataResponse;
