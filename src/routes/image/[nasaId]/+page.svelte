@@ -1,10 +1,10 @@
 <script lang="ts">
-	import Image from '$lib/components/Image.svelte';
-	import ImageTag from '$lib/components/ImageTag.svelte';
+	import Image from '#lib/components/Image.svelte';
+	import ImageTag from '#lib/components/ImageTag.svelte';
 	import { twMerge } from 'tailwind-merge';
 	import type { PageData } from './$types';
 	import RelatedImageGallery from './RelatedImageGallery.svelte';
-	import { formatExifDate, stripUnsafeUrlChars } from '$lib/helpers';
+	import { formatExifDate, stripUnsafeUrlChars } from '#lib/helpers.js';
 
 	interface Props {
 		data: PageData;

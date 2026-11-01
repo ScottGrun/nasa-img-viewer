@@ -1,4 +1,4 @@
-import type { AssetManifestResponse, MetadataResponse } from '$lib/types';
+import type { AssetManifestResponse, MetadataResponse } from '#lib/types.js';
 import type { PageServerLoad } from './$types';
 
 const BASE_URL = 'https://images-api.nasa.gov';

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import CategoryPill from '$lib/components/CategoryCarousel/CategoryPill.svelte';
-	import Masonary from '$lib/components/Masonary/Masonary.svelte';
+	import CategoryPill from '#lib/components/CategoryCarousel/CategoryPill.svelte';
+	import Masonary from '#lib/components/Masonary/Masonary.svelte';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -106,7 +106,7 @@
 	const parsedParams = $derived(page.url.searchParams.values().toArray());
 </script>
 
-<nav class="no-scrollbar mb-3 flex gap-4 overflow-x-scroll py-1">
+<nav class="mb-3 no-scrollbar flex gap-4 overflow-x-scroll py-1">
 	{#each categories as category}
 		<CategoryPill
 			label={category.label}

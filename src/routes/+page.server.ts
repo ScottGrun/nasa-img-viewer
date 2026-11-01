@@ -1,4 +1,4 @@
-import type { SearchResponse } from '$lib/types';
+import type { SearchResponse } from '#lib/types.js';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ url, fetch }) => {

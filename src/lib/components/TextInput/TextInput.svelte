@@ -22,7 +22,7 @@
 		)}
 	/>
 	{#if icon}
-		<div class="py-auto absolute bottom-0 right-3.5 top-0 my-auto h-4 w-4">
+		<div class="py-auto absolute top-0 right-3.5 bottom-0 my-auto h-4 w-4">
 			{@render icon()}
 		</div>
 	{/if}

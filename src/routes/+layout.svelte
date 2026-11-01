@@ -1,8 +1,8 @@
 <script lang="ts">
 	import '../app.css';
-	import Logo from '$lib/assets/icons/Logo.svelte';
-	import Search from '$lib/assets/icons/Search.svelte';
-	import TextInput from '$lib/components/TextInput/TextInput.svelte';
+	import Logo from '#lib/assets/icons/Logo.svelte';
+	import Search from '#lib/assets/icons/Search.svelte';
+	import TextInput from '#lib/components/TextInput/TextInput.svelte';
 	let { children } = $props();
 </script>
 
@@ -15,7 +15,7 @@
 	data-sveltekit-preload-data="hover"
 	data-sveltekit-reload
 >
-	<header class="pb-4 pt-7">
+	<header class="pt-7 pb-4">
 		<nav class="gap flex w-full items-center gap-4">
 			<a href="/">
 				<span class="sr-only">Home</span>

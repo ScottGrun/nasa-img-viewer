@@ -21,7 +21,7 @@
 		}
 	};
 
-	import type { AssetManifestItem } from '$lib/types';
+	import type { AssetManifestItem } from '#lib/types.js';
 
 	// Function to get image by size suffix
 	const getImageBySize = (suffix: string) => {
@@ -68,7 +68,7 @@
 					onload={onLoad}
 					{...rest}
 					class={twMerge(
-						'duration-600 absolute left-0 top-0 h-full w-full object-cover opacity-0 transition-all ease-in',
+						'absolute top-0 left-0 h-full w-full object-cover opacity-0 transition-all duration-600 ease-in',
 						imageLoaded && 'relative opacity-100',
 						className
 					)}
@@ -81,7 +81,7 @@
 			onload={onLoad}
 			{...rest}
 			class={twMerge(
-				'absolute left-0 top-0 h-full w-full object-cover opacity-0 transition-all duration-300 ease-in',
+				'absolute top-0 left-0 h-full w-full object-cover opacity-0 transition-all duration-300 ease-in',
 				imageLoaded && 'relative opacity-100',
 				className
 			)}

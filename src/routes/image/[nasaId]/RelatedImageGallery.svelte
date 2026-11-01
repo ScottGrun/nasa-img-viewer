@@ -1,6 +1,6 @@
 <script lang="ts">
-	import Masonary from '$lib/components/Masonary/Masonary.svelte';
-	import type { SearchResponse } from '$lib/types';
+	import Masonary from '#lib/components/Masonary/Masonary.svelte';
+	import type { SearchResponse } from '#lib/types.js';
 	import { onMount } from 'svelte';
 
 	interface Props {
