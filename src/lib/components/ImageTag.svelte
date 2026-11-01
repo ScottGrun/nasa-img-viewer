@@ -7,7 +7,7 @@
 </script>
 
 <a
-	href={resolve(`/?q=${keyword}`)}
+	href={resolve(`/?${new URLSearchParams({ keywords: keyword })}`)}
 	class="block rounded-sm bg-gray-50 px-2 py-1 text-sm font-medium text-neutral-600 transition-colors hover:bg-gray-200"
 	>{keyword}</a
 >

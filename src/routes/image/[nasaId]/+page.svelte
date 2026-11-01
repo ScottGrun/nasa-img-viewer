@@ -5,7 +5,7 @@
 	import { twMerge } from 'tailwind-merge';
 	import type { PageData } from './$types';
 	import RelatedImageGallery from './RelatedImageGallery.svelte';
-	import { formatExifDate, stripUnsafeUrlChars } from '#lib/helpers.js';
+	import { formatExifDate } from '#lib/helpers.js';
 
 	interface Props {
 		data: PageData;
@@ -14,9 +14,7 @@
 	const asset = $derived(data.asset);
 	const metadata = $derived(data.metadata);
 
-	const keywords = $derived(
-		(metadata['AVAIL:Keywords'] ?? []).map((keyword) => stripUnsafeUrlChars(keyword))
-	);
+	const keywords = $derived(metadata['AVAIL:Keywords'] ?? []);
 	const width = $derived(Number(metadata['EXIF:ImageWidth'] ?? metadata['File:ImageWidth'] ?? 16));
 	const height = $derived(
 		Number(metadata['EXIF:ImageHeight'] ?? metadata['File:ImageHeight'] ?? 9)
@@ -72,13 +70,13 @@
 				{@render imageInfo(
 					'Photographer',
 					photographer,
-					photographer && `photographer=${stripUnsafeUrlChars(photographer)}`
+					photographer && new URLSearchParams({ photographer }).toString()
 				)}
 				{@render imageInfo('Album', metadata['AVAIL:Album']?.[0])}
 				{@render imageInfo(
 					'Location',
 					location,
-					location && `location=${stripUnsafeUrlChars(location)}`
+					location && new URLSearchParams({ location }).toString()
 				)}
 				{@render imageInfo(
 					'Date',
