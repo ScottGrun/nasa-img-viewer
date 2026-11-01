@@ -24,6 +24,18 @@ describe('buildSearchParams', () => {
 		expect(buildSearchParams(sp('q=moon')).has('year_start')).toBe(false);
 	});
 
+	it('validates, clamps and orders the years', () => {
+		const now = new Date('2026-05-05');
+		const years = (q: string) => {
+			const p = buildSearchParams(sp(q), 1, now);
+			return [p.get('year_start'), p.get('year_end')];
+		};
+		expect(years('q=a&year_start=1800&year_end=2999')).toEqual(['1920', '2026']);
+		expect(years('q=a&year_start=1990&year_end=1970')).toEqual(['1970', '1990']);
+		expect(years('q=a&year_start=abc&year_end=19')).toEqual([null, null]);
+		expect(years('year_start=abc')).toEqual(['2026', null]);
+	});
+
 	it('sets page only after the first', () => {
 		expect(buildSearchParams(sp('q=a'), 1).has('page')).toBe(false);
 		expect(buildSearchParams(sp('q=a'), 3).get('page')).toBe('3');

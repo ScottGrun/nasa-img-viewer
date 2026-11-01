@@ -4,6 +4,8 @@
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import type { Snapshot } from './$types';
 	import { dedupeImages, type GalleryImage } from '#lib/images.js';
+	import DateRangeSlider from '#lib/components/DateRangeSlider.svelte';
+	import { effectiveRange, parseYearParams, withoutYears } from '#lib/years.js';
 	import CategoryPill from '#lib/components/CategoryCarousel/CategoryPill.svelte';
 	import Masonary from '#lib/components/Masonary/Masonary.svelte';
 	import type { PageData } from './$types';
@@ -98,7 +100,30 @@
 	});
 
 	const searchTerm = $derived(
-		page.url.searchParams.get('q') || (page.url.searchParams.values().next().value ?? '')
+		page.url.searchParams.get('q') ||
+			([...page.url.searchParams].find(
+				([name, value]) => value && !['year_start', 'year_end', 'page'].includes(name)
+			)?.[1] ??
+				'')
+	);
+
+	// Pills and the header search keep the chosen years
+	const yearQuery = $derived(
+		['year_start', 'year_end']
+			.filter((name) => page.url.searchParams.has(name))
+			.map((name) => `&${name}=${encodeURIComponent(page.url.searchParams.get(name) ?? '')}`)
+			.join('')
+	);
+	const maxYear = new Date().getFullYear();
+	const yearsSet = $derived.by(() => {
+		const { start, end } = parseYearParams(page.url.searchParams, maxYear);
+		return start !== undefined || end !== undefined;
+	});
+	const resetSearch = $derived(withoutYears(page.url.searchParams));
+	const range = $derived(effectiveRange(page.url.searchParams, maxYear));
+	const emptyMessage = $derived(
+		(searchTerm ? `No images found for "${searchTerm}"` : 'No images found') +
+			(yearsSet ? ` between ${range.start} and ${range.end}` : '')
 	);
 	const title = $derived(searchTerm ? `${searchTerm} | NASA Image Viewer` : 'NASA Image Viewer');
 
@@ -194,22 +219,23 @@
 	{#each categories as category (category.label)}
 		<CategoryPill
 			label={category.label}
-			query={category.query}
+			query={category.query + yearQuery}
 			imageUrl={category.imageUrl}
 			isActive={parsedParams.includes(category.label)}
 		/>
 	{/each}
 </nav>
+<DateRangeSlider />
 <main>
 	{#if total === 0}
 		<div class="py-16 text-center">
 			<p class="text-lg font-semibold text-primary-dark">
-				{searchTerm ? `No images found for "${searchTerm}"` : 'No images found'}
+				{emptyMessage}
 			</p>
 			<a
-				href={resolve('/')}
+				href={yearsSet && resetSearch ? resolve(`/?${resetSearch}`) : resolve('/')}
 				class="mt-4 inline-block text-sm font-semibold text-primary-dark transition-colors hover:text-nasa-red"
-				>Back to home</a
+				>{yearsSet ? 'Reset years' : 'Back to home'}</a
 			>
 		</div>
 	{:else}

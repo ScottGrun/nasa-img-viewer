@@ -959,3 +959,232 @@ test.describe('image lightbox', () => {
 		});
 	});
 });
+
+test.describe('date range slider', () => {
+	const YEAR = new Date().getFullYear();
+	const earliest = (page: Page) => page.getByLabel('Earliest year');
+	const latest = (page: Page) => page.getByLabel('Latest year');
+	const slider = (page: Page) => page.getByRole('group', { name: 'Year range' });
+	const RANGE = '/?q=Apollo&year_start=1969&year_end=1972';
+
+	const values = async (page: Page) => [
+		await earliest(page).inputValue(),
+		await latest(page).inputValue()
+	];
+
+	test('shows on home and search pages, not on the detail page', async ({ page }) => {
+		await page.goto('/');
+		await expect(slider(page)).toBeVisible();
+		await page.goto('/?q=Apollo');
+		await expect(slider(page)).toBeVisible();
+		await page.goto(DETAIL);
+		await expect(page.locator('h1')).toBeVisible();
+		await expect(slider(page)).toHaveCount(0);
+		await expect(page.locator('input[type="hidden"][name^="year_"]')).toHaveCount(0);
+	});
+
+	test('shows the real filter as its initial values', async ({ page }) => {
+		await page.goto('/');
+		expect(await values(page)).toEqual([String(YEAR), String(YEAR)]);
+		await page.goto('/?q=Apollo');
+		expect(await values(page)).toEqual(['1920', String(YEAR)]);
+		await page.goto(RANGE);
+		expect(await values(page)).toEqual(['1969', '1972']);
+	});
+
+	test('clamps and ignores bad year params without erroring', async ({ page }) => {
+		const bad = await page.goto('/?year_start=abc');
+		expect(bad?.status()).toBe(200);
+		expect(await values(page)).toEqual([String(YEAR), String(YEAR)]);
+		const wide = await page.goto('/?year_start=1800&year_end=2999');
+		expect(wide?.status()).toBe(200);
+		expect(await values(page)).toEqual(['1920', String(YEAR)]);
+	});
+
+	test('a keyboard change updates the URL and the results, keeping q', async ({
+		page,
+		request
+	}) => {
+		await page.goto(RANGE);
+		await expect(imageLinks(page).first()).toBeAttached();
+		const before = await hrefs(page);
+		await latest(page).focus();
+		await page.keyboard.press('ArrowLeft');
+		await expect(page).toHaveURL(/year_end=1971/);
+		const url = new URL(page.url());
+		expect(url.searchParams.get('q')).toBe('Apollo');
+		expect(url.searchParams.get('year_start')).toBe('1969');
+		await expect(latest(page)).toBeFocused();
+		await expect
+			.poll(async () => JSON.stringify(await hrefs(page)))
+			.not.toBe(JSON.stringify(before));
+
+		// Compare with what NASA itself returns for that range
+		const nasa = await request.get(
+			'https://images-api.nasa.gov/search?q=Apollo&year_start=1969&year_end=1971&media_type=image&page_size=48'
+		);
+		const items = (await nasa.json()).collection.items as { data: { nasa_id: string }[] }[];
+		const expected = items.map((item) => `/image/${encodeURIComponent(item.data[0].nasa_id)}`);
+		const shown = (await hrefs(page)).map((href) => href ?? '');
+		expect(shown.length).toBeGreaterThan(0);
+		for (const href of shown) expect(expected).toContain(href);
+	});
+
+	test('a drag makes one navigation, on release', async ({ page }) => {
+		await page.goto('/?q=Apollo');
+		await expect(imageLinks(page).first()).toBeAttached();
+		const box = await slider(page).locator('div.range').boundingBox();
+		if (!box) throw new Error('no slider box');
+		let navigations = 0;
+		page.on('request', (req) => {
+			if (new URL(req.url()).pathname === '/__data.json') navigations++;
+		});
+		const y = box.y + box.height / 2;
+		await page.mouse.move(box.x + box.width - 12, y);
+		await page.mouse.down();
+		await page.mouse.move(box.x + box.width * 0.6, y, { steps: 25 });
+		expect(navigations).toBe(0);
+		await page.mouse.up();
+		await expect(page).toHaveURL(/year_end=/);
+		await page.waitForLoadState('networkidle');
+		expect(navigations).toBe(1);
+	});
+
+	test('thumbs cannot cross', async ({ page }) => {
+		await page.goto('/?q=Apollo&year_start=2000&year_end=2010');
+		await latest(page).fill('1990');
+		expect(await values(page)).toEqual(['2000', '2000']);
+		await expect(page).toHaveURL(/year_end=2000/);
+		await earliest(page).fill('2020');
+		expect(await values(page)).toEqual(['2000', '2000']);
+	});
+
+	test('Reset removes both params and is hidden by default', async ({ page }) => {
+		await page.goto('/?q=Apollo');
+		await expect(page.getByRole('link', { name: 'Reset' })).toBeHidden();
+		await page.goto(RANGE);
+		await page.getByRole('link', { name: 'Reset' }).click();
+		await expect(page).toHaveURL(/\/\?q=Apollo$/);
+		expect(await values(page)).toEqual(['1920', String(YEAR)]);
+	});
+
+	test('the full range keeps the plain home page from falling back to this year', async ({
+		page
+	}) => {
+		await page.goto('/');
+		await earliest(page).fill('1920');
+		await expect(page).toHaveURL(/year_start=1920$/);
+		expect(await values(page)).toEqual(['1920', String(YEAR)]);
+	});
+
+	test('header search and a pill keep the range', async ({ page }) => {
+		await page.goto(RANGE);
+		await page.locator('#img-search').fill('Gemini');
+		await page.locator('#img-search').press('Enter');
+		await expect(page).toHaveURL(/q=Gemini/);
+		let params = new URL(page.url()).searchParams;
+		expect([params.get('year_start'), params.get('year_end')]).toEqual(['1969', '1972']);
+
+		await page.locator('nav a[href^="/?q="]').first().click();
+		await expect(page).toHaveURL(/q=Apollo/);
+		params = new URL(page.url()).searchParams;
+		expect([params.get('year_start'), params.get('year_end')]).toEqual(['1969', '1972']);
+	});
+
+	test('an empty range says so and offers a reset', async ({ page }) => {
+		await page.goto('/?q=Apollo&year_start=1921&year_end=1922');
+		await expect(
+			page.getByText('No images found for "Apollo" between 1921 and 1922')
+		).toBeVisible();
+		await page.getByRole('link', { name: 'Reset years' }).click();
+		await expect(page).toHaveURL(/\/\?q=Apollo$/);
+		await expect(imageLinks(page).first()).toBeAttached();
+	});
+
+	test('a range survives Back from a detail page', async ({ page }) => {
+		await page.goto(RANGE);
+		await expect(imageLinks(page).first()).toBeAttached();
+		await imageLinks(page).first().click({ force: true });
+		await expect(page).toHaveURL(/\/image\//);
+		await page.goBack();
+		await expect(page).toHaveURL(/year_start=1969&year_end=1972/);
+		expect(await values(page)).toEqual(['1969', '1972']);
+	});
+
+	test.describe('on a phone', () => {
+		test.use({ viewport: { width: 390, height: 844 } });
+
+		test('fits without horizontal overflow', async ({ page }) => {
+			await page.goto(RANGE);
+			await expect(slider(page)).toBeVisible();
+			const box = await slider(page).boundingBox();
+			expect(box && box.x + box.width).toBeLessThanOrEqual(390);
+			const overflow = await page.evaluate(
+				() => document.documentElement.scrollWidth - document.documentElement.clientWidth
+			);
+			expect(overflow).toBeLessThanOrEqual(0);
+		});
+	});
+});
+
+test.describe('navigation progress bar', () => {
+	test.use({ viewport: { width: 1280, height: 800 } });
+
+	test('appears for a slow navigation, but not until it has waited a moment', async ({ page }) => {
+		await page.goto('/?q=Apollo');
+		await expect(imageLinks(page).first()).toBeAttached();
+		await page.route(/\/image\/.*__data\.json/, async (route) => {
+			await new Promise((resolve) => setTimeout(resolve, 900));
+			await route.continue();
+		});
+		const bar = page.locator('[data-progress]');
+		await imageLinks(page)
+			.first()
+			.evaluate((el) => (el as HTMLElement).click());
+		await page.waitForTimeout(30);
+		await expect(bar).toHaveCount(0);
+		await expect(bar).toBeVisible();
+		await expect(page).toHaveURL(/\/image\//);
+		await expect(bar).toHaveCount(0);
+	});
+
+	test('does not flash for a navigation that is already preloaded', async ({ page }) => {
+		await page.goto('/?q=Apollo');
+		const card = imageLinks(page).first();
+		await expect(card).toBeAttached();
+		await page.evaluate(() => {
+			const w = window as unknown as { __bar: boolean };
+			w.__bar = false;
+			new MutationObserver(() => {
+				if (document.querySelector('[data-progress]')) w.__bar = true;
+			}).observe(document.body, { childList: true, subtree: true });
+		});
+		await card.hover({ force: true });
+		await page.waitForTimeout(2500);
+		await card.click({ force: true });
+		await expect(page).toHaveURL(/\/image\//);
+		await expect(page.locator('h1')).not.toBeEmpty();
+		expect(await page.evaluate(() => (window as unknown as { __bar: boolean }).__bar)).toBe(false);
+	});
+});
+
+test('clicking a related image shows the new page at the top with its main image', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1280, height: 800 });
+	await page.goto(DETAIL);
+	const related = page.locator('section:has(h2:text("Related images")) a[href^="/image/"]');
+	await expect(related.first()).toBeAttached();
+	const card = related.nth(2);
+	const href = await card.getAttribute('href');
+	await card.scrollIntoViewIfNeeded();
+	expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+	await card.click({ force: true });
+	await expect(page).toHaveURL(new RegExp(`${href}$`));
+	const main = page.locator('main picture img').first();
+	await expect(main).toBeVisible();
+	await expect
+		.poll(() => main.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
+		.toBe(true);
+	await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+});

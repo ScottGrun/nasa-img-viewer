@@ -1,22 +1,11 @@
 import { toGalleryImages, type GalleryImage } from '#lib/images.js';
 import type { Link, SearchResponse } from '#lib/types.js';
+import { SEARCH_PARAMS, parseYearParams } from '#lib/years.js';
 import { nasaJson, NasaError, SEARCH_TTL } from './nasa.js';
 
 export const PAGE_SIZE = 48;
 
-export const SEARCH_PARAMS = [
-	'q',
-	'center',
-	'description',
-	'keywords',
-	'location',
-	'nasa_id',
-	'photographer',
-	'secondary_creator',
-	'title',
-	'year_start',
-	'year_end'
-];
+export { SEARCH_PARAMS };
 
 /** Builds the NASA search params from whitelisted, non-empty request params. */
 export const buildSearchParams = (
@@ -27,8 +16,11 @@ export const buildSearchParams = (
 	const params = new URLSearchParams();
 	for (const name of SEARCH_PARAMS) {
 		const value = source.get(name)?.trim();
-		if (value) params.set(name, value);
+		if (value && name !== 'year_start' && name !== 'year_end') params.set(name, value);
 	}
+	const { start, end } = parseYearParams(source, now.getFullYear());
+	if (start !== undefined) params.set('year_start', String(start));
+	if (end !== undefined) params.set('year_end', String(end));
 	if (params.size === 0) params.set('year_start', String(now.getFullYear()));
 	params.set('media_type', 'image');
 	params.set('page_size', String(PAGE_SIZE));

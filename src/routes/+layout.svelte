@@ -50,6 +50,14 @@
 					value={page.url.searchParams.get('q') ?? ''}
 					icon={searchIcon}
 				/>
+				{#if page.route.id === '/'}
+					{#each ['year_start', 'year_end'] as name (name)}
+						{@const value = page.url.searchParams.get(name)}
+						{#if value !== null}
+							<input type="hidden" {name} {value} />
+						{/if}
+					{/each}
+				{/if}
 			</form>
 		</nav>
 	</header>
