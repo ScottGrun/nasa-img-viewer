@@ -46,7 +46,7 @@
 					src={medium}
 					{...rest}
 					class={twMerge(
-						'absolute top-0 left-0 h-full w-full object-cover opacity-0 transition-all duration-600 ease-in',
+						'absolute top-0 left-0 h-full w-full object-cover opacity-0 transition-all duration-150 ease-out',
 						imageLoaded && 'relative opacity-100',
 						className
 					)}
@@ -59,7 +59,7 @@
 			onload={onLoad}
 			{...rest}
 			class={twMerge(
-				'absolute top-0 left-0 h-full w-full object-cover opacity-0 transition-all duration-300 ease-in',
+				'absolute top-0 left-0 h-full w-full object-cover opacity-0 transition-all duration-150 ease-out',
 				imageLoaded && 'relative opacity-100',
 				className
 			)}
