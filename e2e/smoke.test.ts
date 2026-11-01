@@ -73,3 +73,21 @@ test('detail page updates when navigating between images via the related gallery
 	await expect(page.locator('h1')).toBeVisible();
 	await expect(page.locator('h1')).not.toHaveText(startTitle);
 });
+
+test('Inter and DM Mono web fonts load', async ({ page }) => {
+	const fontStatuses: Record<string, number> = {};
+	page.on('response', (res) => {
+		if (/\.woff2?$/.test(res.url())) fontStatuses[res.url().split('/').pop()!] = res.status();
+	});
+
+	await page.goto('/');
+	await imageLinks(page).first().click({ force: true });
+	await expect(page.locator('h1')).toBeVisible();
+	await page.evaluate(() => document.fonts.ready);
+
+	expect(Object.keys(fontStatuses).some((f) => f.startsWith('inter-'))).toBe(true);
+	expect(Object.keys(fontStatuses).some((f) => f.startsWith('dm-mono-'))).toBe(true);
+	expect(Object.values(fontStatuses).every((s) => s === 200)).toBe(true);
+	expect(await page.evaluate(() => document.fonts.check("16px 'Inter Variable'"))).toBe(true);
+	expect(await page.evaluate(() => document.fonts.check("16px 'DM Mono'"))).toBe(true);
+});

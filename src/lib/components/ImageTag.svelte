@@ -7,6 +7,6 @@
 
 <a
 	href={`/?q=${keyword}`}
-	class="block rounded-[0.25rem] bg-gray-50 px-2 py-1 text-sm font-medium text-neutral-600 transition-colors hover:bg-gray-200"
+	class="block rounded-sm bg-gray-50 px-2 py-1 text-sm font-medium text-neutral-600 transition-colors hover:bg-gray-200"
 	>{keyword}</a
 >
