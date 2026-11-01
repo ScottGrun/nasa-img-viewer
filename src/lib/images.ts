@@ -87,7 +87,7 @@ export const toGalleryImage = (item: SearchResultItem): GalleryImage | undefined
 	const mediumWidth = positive(medium?.width);
 	const srcset =
 		small && medium && smallWidth && mediumWidth
-			? `${small.href} ${smallWidth}w, ${medium.href} ${mediumWidth}w`
+			? `${normalizeHref(small.href)} ${smallWidth}w, ${normalizeHref(medium.href)} ${mediumWidth}w`
 			: undefined;
 
 	const width = positive(chosen.width);
@@ -98,7 +98,7 @@ export const toGalleryImage = (item: SearchResultItem): GalleryImage | undefined
 		title: data.title ?? '',
 		description: truncate(data.description ?? ''),
 		preview: pickPreviewSources(links.map((link) => normalizeHref(link.href))),
-		src: chosen.href,
+		src: normalizeHref(chosen.href),
 		srcset,
 		...(width && height ? { width, height } : {})
 	};

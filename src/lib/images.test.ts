@@ -100,3 +100,20 @@ describe('pickPreviewSources', () => {
 		expect(pickPreviewSources([hrefs[0]])).toEqual({ large: hrefs[0], medium: hrefs[0] });
 	});
 });
+
+describe('toGalleryImage URLs', () => {
+	it('encodes spaces and uses https so srcset candidates stay valid', () => {
+		const base = 'http://images-assets.nasa.gov/image/APOLLO 50th/APOLLO 50th';
+		const image = toGalleryImage({
+			href: '',
+			data: [{ nasa_id: 'APOLLO 50th', title: 't', description: 'd' }],
+			links: [
+				{ href: `${base}~small.jpg`, rel: 'alternate', width: 480 },
+				{ href: `${base}~medium.jpg`, rel: 'alternate', width: 960 }
+			]
+		} as unknown as Parameters<typeof toGalleryImage>[0]);
+		const prefix = 'https://images-assets.nasa.gov/image/APOLLO%2050th/APOLLO%2050th';
+		expect(image?.src).toBe(`${prefix}~small.jpg`);
+		expect(image?.srcset).toBe(`${prefix}~small.jpg 480w, ${prefix}~medium.jpg 960w`);
+	});
+});
