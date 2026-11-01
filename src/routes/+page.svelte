@@ -1,13 +1,11 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import type { Snapshot } from './$types';
-	import { dedupeImages, type GalleryImage } from '#lib/images.js';
+	import InfiniteGallery, { type Loaded } from '#lib/components/InfiniteGallery.svelte';
 	import DateRangeSlider from '#lib/components/DateRangeSlider.svelte';
 	import { effectiveRange, parseYearParams, withoutYears } from '#lib/years.js';
 	import CategoryPill from '#lib/components/CategoryCarousel/CategoryPill.svelte';
-	import Masonary from '#lib/components/Masonary/Masonary.svelte';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -16,88 +14,15 @@
 
 	let { data }: Props = $props();
 
-	interface Loaded {
-		search: string;
-		batches: GalleryImage[][];
-		nextPage: number;
-		hasMore: boolean;
-	}
-
-	// State for infinite scroll. It only applies while `search` matches the URL; otherwise the
-	// freshly loaded data wins, so a new search resets without an effect.
+	// Infinite scroll state, restored on Back. It only applies while the search matches the URL.
 	let loaded = $state<Loaded | undefined>(undefined);
-	const initial: Loaded = $derived({
-		search: page.url.search,
-		batches: [dedupeImages(data.images, new Set())],
-		nextPage: 2,
-		hasMore: data.hasMore
-	});
-	const current = $derived(loaded && loaded.search === page.url.search ? loaded : initial);
-	const total = $derived(current.batches.reduce((sum, batch) => sum + batch.length, 0));
 
 	export const snapshot: Snapshot<Loaded | undefined> = {
-		capture: () => $state.snapshot(current),
+		capture: () => $state.snapshot(loaded),
 		restore: (value) => {
 			loaded = value;
 		}
 	};
-
-	let failedSearch: string | undefined = $state(undefined);
-	const failed = $derived(failedSearch === page.url.search);
-	let sentinel: HTMLElement | undefined = $state(undefined);
-	let inFlight: { search: string; controller: AbortController } | undefined;
-
-	const loadMore = async () => {
-		const snap = current;
-		if (!snap.hasMore || inFlight?.search === snap.search) return;
-		inFlight?.controller.abort();
-		const request = { search: snap.search, controller: new AbortController() };
-		inFlight = request;
-
-		try {
-			const params = new SvelteURLSearchParams(snap.search);
-			params.set('page', String(snap.nextPage));
-			const res = await fetch(`/api/search?${params}`, { signal: request.controller.signal });
-			if (!res.ok) throw new Error(`Request failed with ${res.status}`);
-			const body = (await res.json()) as { images: GalleryImage[]; hasMore: boolean };
-			// The search changed while this was in flight
-			if (page.url.search !== snap.search) return;
-
-			const seen = new Set(current.batches.flat().map((image) => image.nasaId));
-			loaded = {
-				search: snap.search,
-				batches: [...current.batches, dedupeImages(body.images, seen)],
-				nextPage: snap.nextPage + 1,
-				hasMore: body.hasMore
-			};
-		} catch {
-			if (!request.controller.signal.aborted && page.url.search === snap.search) {
-				failedSearch = snap.search;
-			}
-		} finally {
-			if (inFlight === request) inFlight = undefined;
-		}
-	};
-
-	const retry = () => {
-		failedSearch = undefined;
-	};
-
-	// Re-created whenever the state changes, so an observer always reports the sentinel's current
-	// visibility (covering the case where a batch adds nothing new and it's still on screen).
-	$effect(() => {
-		// Track what should restart observation
-		void [current.search, current.nextPage, current.hasMore];
-		if (!sentinel || !current.hasMore || failed) return;
-		const observer = new IntersectionObserver(
-			(entries) => {
-				if (entries.some((entry) => entry.isIntersecting)) void loadMore();
-			},
-			{ rootMargin: '800px 0px' }
-		);
-		observer.observe(sentinel);
-		return () => observer.disconnect();
-	});
 
 	const searchTerm = $derived(
 		page.url.searchParams.get('q') ||
@@ -227,27 +152,24 @@
 </nav>
 <DateRangeSlider />
 <main>
-	{#if total === 0}
-		<div class="py-16 text-center">
-			<p class="text-lg font-semibold text-primary-dark">
-				{emptyMessage}
-			</p>
-			<a
-				href={yearsSet && resetSearch ? resolve(`/?${resetSearch}`) : resolve('/')}
-				class="mt-4 inline-block text-sm font-semibold text-primary-dark transition-colors hover:text-nasa-red"
-				>{yearsSet ? 'Reset years' : 'Back to home'}</a
-			>
-		</div>
-	{:else}
-		<Masonary images={current.batches.flat()} />
-		<div bind:this={sentinel} aria-hidden="true"></div>
-		<div class="py-6 text-center text-xs text-neutral-500">
-			{#if failed}
-				<span>Couldn't load more images.</span>
-				<button type="button" class="ml-1 font-semibold underline" onclick={retry}>Retry</button>
-			{:else if !current.hasMore}
-				<span>No more images</span>
-			{/if}
-		</div>
-	{/if}
+	<InfiniteGallery
+		key={page.url.search}
+		query={page.url.search}
+		images={data.images}
+		hasMore={data.hasMore}
+		bind:loaded
+	>
+		{#snippet empty()}
+			<div class="py-16 text-center">
+				<p class="text-lg font-semibold text-primary-dark">
+					{emptyMessage}
+				</p>
+				<a
+					href={yearsSet && resetSearch ? resolve(`/?${resetSearch}`) : resolve('/')}
+					class="mt-4 inline-block text-sm font-semibold text-primary-dark transition-colors hover:text-nasa-red"
+					>{yearsSet ? 'Reset years' : 'Back to home'}</a
+				>
+			</div>
+		{/snippet}
+	</InfiniteGallery>
 </main>
