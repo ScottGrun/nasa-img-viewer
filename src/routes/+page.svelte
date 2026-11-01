@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import CategoryPill from '$lib/components/CategoryCarousel/CategoryPill.svelte';
 	import Masonary from '$lib/components/Masonary/Masonary.svelte';
 	import type { PageData } from './$types';
@@ -101,7 +101,7 @@
 		}
 	];
 
-	const parsedParams = $page.url.searchParams.values().toArray();
+	const parsedParams = page.url.searchParams.values().toArray();
 </script>
 
 <nav class="no-scrollbar mb-3 flex gap-4 overflow-x-scroll py-1">
