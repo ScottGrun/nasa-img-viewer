@@ -166,7 +166,10 @@ test('infinite scroll appends images without duplicates or moving earlier ones',
 	const ids = (await hrefs(page)) as string[];
 	expect(new Set(ids).size).toBe(ids.length);
 	expect(ids[0]).toBe(firstHref);
-	expect(await position(first)).toEqual(before);
+	// Sub-pixel layout differences are fine; an image changing column would move it far more.
+	const after = await position(first);
+	expect(Math.abs(after.x - before.x)).toBeLessThanOrEqual(1);
+	expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(1);
 });
 
 test('shows "No more images" at the end of a short result set', async ({ page }) => {
