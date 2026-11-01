@@ -140,3 +140,20 @@ export const clampLens = (diameter: number, viewport: Size) =>
 /** Multiplicative wheel resize: scrolling up (negative deltaY) makes the glass bigger. */
 export const wheelLens = (diameter: number, deltaY: number, viewport: Size) =>
 	clampLens(diameter * Math.exp(-deltaY * WHEEL_SENSITIVITY), viewport);
+
+const LIGHTBOX_MARGIN = 32;
+
+/**
+ * Size of the lightbox picture: as large as fits the viewport (minus a margin) at `aspect`,
+ * but never wider than `maxWidth` (the image's own pixel width) when that is known.
+ */
+export const fitSize = (aspect: number, viewport: Size, maxWidth?: number): Size => {
+	const safe = Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
+	const availW = Math.max(1, viewport.w - LIGHTBOX_MARGIN * 2);
+	const availH = Math.max(1, viewport.h - LIGHTBOX_MARGIN * 2);
+	let w = Math.min(availW, availH * safe);
+	if (maxWidth !== undefined && Number.isFinite(maxWidth) && maxWidth > 0) {
+		w = Math.min(w, maxWidth);
+	}
+	return { w, h: w / safe };
+};

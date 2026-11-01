@@ -370,253 +370,338 @@ test.describe('hover preload (phone)', () => {
 	});
 });
 
-test.describe('image magnifier', () => {
+test.describe('image lightbox', () => {
+	const trigger = (page: Page) => page.getByRole('button', { name: 'View full screen' });
+	const dialog = (page: Page) => page.getByRole('dialog');
+	const picture = (page: Page) =>
+		dialog(page).getByRole('button', { name: 'Toggle image magnifier' });
+	const closeButton = (page: Page) => page.getByRole('button', { name: 'Close full screen view' });
 	const glass = (page: Page) => page.getByTestId('magnifier-glass');
 	const glassImg = (page: Page) => glass(page).locator('img');
-	const target = (page: Page) => page.getByRole('button', { name: 'Toggle image magnifier' });
+	const minimap = (page: Page) => page.getByTestId('magnifier-minimap');
+	const marker = (page: Page) => page.getByTestId('magnifier-marker');
+	const hint = (page: Page) => page.getByTestId('magnifier-hint');
 
-	test('shows a glass on hover, loads the original, zooms and toggles', async ({ page }) => {
-		test.setTimeout(120_000);
-		const requested: string[] = [];
+	const load = async (page: Page, requested: string[]) => {
 		page.on('request', (req) => requested.push(req.url()));
-		await page.setViewportSize({ width: 1280, height: 800 });
 		await page.goto(DETAIL);
 		await expect(page.locator('main picture img').first()).toBeAttached();
+		await expect
+			.poll(() =>
+				page
+					.locator('main picture img')
+					.first()
+					.evaluate((el: HTMLImageElement) => el.naturalWidth)
+			)
+			.toBeGreaterThan(0);
 		await page.waitForLoadState('networkidle');
-		expect(requested.filter((u) => u.includes('~orig'))).toEqual([]);
+	};
+	const settled = (page: Page) =>
+		expect
+			.poll(() => page.getByTestId('lightbox-picture').evaluate((el) => el.getAnimations().length))
+			.toBe(0);
 
-		const box = (await target(page).boundingBox())!;
-		await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
-		await page.mouse.move(box.x + box.width * 0.5 + 5, box.y + box.height * 0.5 + 5);
+	const orig = (urls: string[]) => urls.filter((u) => u.includes('~orig'));
+	const isInDialog = (page: Page, testId: string) =>
+		page.getByTestId(testId).evaluate((el) => !!el.closest('dialog'));
+
+	test('the detail page has no magnifier and requests no original', async ({ page }) => {
+		const requested: string[] = [];
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await load(page, requested);
+		await expect(trigger(page)).toHaveAttribute('aria-label', 'View full screen');
+		expect(await trigger(page).evaluate((el) => getComputedStyle(el).cursor)).toBe('zoom-in');
+		const box = (await trigger(page).boundingBox())!;
+		await page.mouse.move(box.x + 100, box.y + 100);
+		await page.mouse.move(box.x + 110, box.y + 100);
+		await page.waitForTimeout(500);
+		await expect(glass(page)).toHaveCount(0);
+		await expect(hint(page)).toHaveCount(0);
+		expect(orig(requested)).toEqual([]);
+	});
+
+	test('opens, loads the original, fits the viewport and locks the page', async ({ page }) => {
+		test.setTimeout(120_000);
+		const requested: string[] = [];
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await load(page, requested);
+		await page.evaluate(() => window.scrollTo(0, 120));
+		const scrollBefore = await page.evaluate(() => window.scrollY);
+		await trigger(page).click();
+		await expect(dialog(page)).toBeVisible();
+		await expect.poll(() => orig(requested).length).toBeGreaterThan(0);
+		await expect
+			.poll(
+				() =>
+					picture(page)
+						.locator('img')
+						.evaluate((el: HTMLImageElement) => el.currentSrc),
+				{
+					timeout: 90_000
+				}
+			)
+			.toContain('~orig');
+		const rect = (await picture(page).locator('img').boundingBox())!;
+		expect(rect.x).toBeGreaterThanOrEqual(0);
+		expect(rect.y).toBeGreaterThanOrEqual(0);
+		expect(rect.x + rect.width).toBeLessThanOrEqual(1280);
+		expect(rect.y + rect.height).toBeLessThanOrEqual(800);
+
+		await page.mouse.move(640, 400);
+		await page.mouse.wheel(0, 400);
+		await page.waitForTimeout(200);
+		expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore);
+
+		await page.keyboard.press('Escape');
+		await expect(dialog(page)).toBeHidden();
+		expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore);
+		await page.mouse.wheel(0, 200);
+		await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(scrollBefore);
+	});
+
+	test('closes with Esc, the X button and the backdrop; clicking the picture does not', async ({
+		page
+	}) => {
+		const requested: string[] = [];
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await load(page, requested);
+
+		for (const how of ['escape', 'button', 'backdrop'] as const) {
+			await trigger(page).click();
+			await expect(dialog(page)).toBeVisible();
+			if (how === 'escape') await page.keyboard.press('Escape');
+			if (how === 'button') await closeButton(page).click();
+			if (how === 'backdrop') {
+				await picture(page).click();
+				await expect(dialog(page)).toBeVisible();
+				await page.mouse.click(8, 400);
+			}
+			await expect(dialog(page)).toBeHidden();
+			await expect(trigger(page)).toBeFocused();
+		}
+	});
+
+	test('glass, zoom, resize, toggle, minimap and hint work inside the lightbox', async ({
+		page
+	}) => {
+		test.setTimeout(120_000);
+		const requested: string[] = [];
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await load(page, requested);
+		await trigger(page).click();
+		await expect(dialog(page)).toBeVisible();
+		await settled(page);
+
+		const box = (await picture(page).boundingBox())!;
+		const move = async (fx: number, fy: number) => {
+			await page.mouse.move(box.x + box.width * fx - 3, box.y + box.height * fy);
+			await page.mouse.move(box.x + box.width * fx, box.y + box.height * fy);
+		};
+		await move(0.5, 0.5);
 		await expect(glass(page)).toBeVisible();
-		await expect.poll(() => requested.some((u) => u.includes('~orig'))).toBe(true);
+		await expect(minimap(page)).toBeVisible();
+		await expect(hint(page)).toHaveText(
+			'Scroll to zoom · Ctrl + scroll to resize · Click to turn off · Esc to close'
+		);
+		expect(await isInDialog(page, 'magnifier-glass')).toBe(true);
+		expect(await isInDialog(page, 'magnifier-minimap')).toBe(true);
+		expect(await isInDialog(page, 'magnifier-hint')).toBe(true);
 		await expect
 			.poll(() => glassImg(page).evaluate((el: HTMLImageElement) => el.currentSrc), {
 				timeout: 90_000
 			})
 			.toContain('~orig');
+		// The minimap uses the already loaded picture, never the original.
+		expect(await minimap(page).locator('img').getAttribute('src')).not.toContain('~orig');
 
-		// Moving the mouse moves the glass and the image inside it.
-		const before = {
-			glass: (await glass(page).boundingBox())!,
-			inner: await glassImg(page).evaluate((el) => getComputedStyle(el).transform)
-		};
-		await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.4);
-		const after = {
-			glass: (await glass(page).boundingBox())!,
-			inner: await glassImg(page).evaluate((el) => getComputedStyle(el).transform)
-		};
-		expect(after.glass.x).not.toBe(before.glass.x);
-		expect(after.inner).not.toBe(before.inner);
+		// Glass follows the mouse.
+		const g0 = (await glass(page).boundingBox())!;
+		await move(0.3, 0.4);
+		expect((await glass(page).boundingBox())!.x).not.toBe(g0.x);
 
-		// Wheel zooms the glass and does not scroll the page; zoom is bounded.
-		const innerWidth = () => glassImg(page).evaluate((el) => el.getBoundingClientRect().width);
-		const w0 = await innerWidth();
-		await page.mouse.wheel(0, -200);
-		await expect.poll(innerWidth).toBeGreaterThan(w0);
-		expect(await page.evaluate(() => window.scrollY)).toBe(0);
-		for (let i = 0; i < 12; i++) await page.mouse.wheel(0, -1000);
-		await expect.poll(innerWidth).toBeGreaterThan(w0);
-		const wMax = await innerWidth();
-		await page.mouse.wheel(0, -1000);
-		await page.waitForTimeout(100);
-		expect(await innerWidth()).toBe(wMax);
-		expect(wMax / box.width).toBeLessThanOrEqual(16 + 0.01);
-		expect(await page.evaluate(() => window.scrollY)).toBe(0);
-
-		// Click turns the glass off, shows a zoom-in cursor and lets the wheel scroll.
-		await target(page).click();
-		await expect(glass(page)).toBeHidden();
-		await expect(target(page)).toHaveAttribute('aria-pressed', 'false');
-		expect(await target(page).evaluate((el) => getComputedStyle(el).cursor)).toBe('zoom-in');
-		await page.mouse.wheel(0, 300);
-		await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-
-		// Click again (scrolled back first) brings it back.
-		await page.evaluate(() => window.scrollTo(0, 0));
-		await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
-		await target(page).click();
-		await page.mouse.move(box.x + box.width * 0.5 + 3, box.y + box.height * 0.5);
-		await expect(glass(page)).toBeVisible();
-
-		// Leaving the image hides it.
-		await target(page).dispatchEvent('pointerleave', { pointerType: 'mouse' });
-		await expect(glass(page)).toBeHidden();
-	});
-
-	test('minimap shows where the glass is and avoids being covered', async ({ page }) => {
-		test.setTimeout(60_000);
-		const requested: string[] = [];
-		page.on('request', (req) => requested.push(req.url()));
-		await page.setViewportSize({ width: 1280, height: 800 });
-		await page.goto(DETAIL);
-		await expect(page.locator('main picture img').first()).toBeAttached();
-		await page.waitForLoadState('networkidle');
-		const minimap = page.getByTestId('magnifier-minimap');
-		const marker = page.getByTestId('magnifier-marker');
-		await expect(minimap).toBeHidden();
-
-		const box = (await target(page).boundingBox())!;
-		const move = async (fx: number, fy: number) => {
-			await page.mouse.move(box.x + box.width * fx - 3, box.y + box.height * fy);
-			await page.mouse.move(box.x + box.width * fx, box.y + box.height * fy);
-		};
+		// Marker tracks the cursor.
 		const fraction = async () => {
-			const m = (await minimap.boundingBox())!;
-			const k = (await marker.boundingBox())!;
+			const m = (await minimap(page).boundingBox())!;
+			const k = (await marker(page).boundingBox())!;
 			return {
 				fx: (k.x + k.width / 2 - m.x) / m.width,
 				fy: (k.y + k.height / 2 - m.y) / m.height
 			};
 		};
+		const f = await fraction();
+		expect(f.fx).toBeCloseTo(0.3, 1);
+		expect(f.fy).toBeCloseTo(0.4, 1);
 
-		await move(0.2, 0.3);
-		await expect(minimap).toBeVisible();
-		// No extra download: the thumbnail is the main image's own source.
-		const mainSrc = await page
-			.locator('main picture img')
-			.first()
-			.evaluate((el: HTMLImageElement) => el.currentSrc);
-		await expect(minimap.locator('img')).toHaveAttribute('src', mainSrc);
-		expect(mainSrc).not.toContain('~orig');
-		const size = (await minimap.boundingBox())!;
-		expect(Math.max(size.width, size.height)).toBeCloseTo(160, 0);
+		// Plain wheel zooms; the glass keeps its size.
+		const innerWidth = () => glassImg(page).evaluate((el) => el.getBoundingClientRect().width);
+		const glassWidth = async () => (await glass(page).boundingBox())!.width;
+		const markerWidth = async () => (await marker(page).boundingBox())!.width;
+		const w0 = await innerWidth();
+		const size0 = await glassWidth();
+		const m0 = await markerWidth();
+		await page.mouse.wheel(0, -200);
+		await expect.poll(innerWidth).toBeGreaterThan(w0);
+		expect(await glassWidth()).toBeCloseTo(size0, 0);
+		await expect.poll(markerWidth).toBeLessThanOrEqual(m0);
 
-		let f = await fraction();
-		expect(f.fx).toBeCloseTo(0.2, 1);
-		expect(f.fy).toBeCloseTo(0.3, 1);
-		await move(0.8, 0.5);
-		f = await fraction();
-		expect(f.fx).toBeCloseTo(0.8, 1);
-		expect(f.fy).toBeCloseTo(0.5, 1);
+		// Ctrl+wheel resizes the glass; zoom is unchanged.
+		const w1 = await innerWidth();
+		await page.keyboard.down('Control');
+		await page.mouse.wheel(0, -200);
+		await page.keyboard.up('Control');
+		await expect.poll(glassWidth).toBeGreaterThan(size0);
+		expect(await innerWidth()).toBeCloseTo(w1, 0);
 
-		// Zooming in shrinks the marker.
-		const before = (await marker.boundingBox())!.width;
-		await page.mouse.wheel(0, -300);
-		await expect.poll(async () => (await marker.boundingBox())!.width).toBeLessThan(before);
+		// Click toggles the glass off and on without closing the lightbox.
+		await picture(page).click();
+		await expect(dialog(page)).toBeVisible();
+		await expect(glass(page)).toBeHidden();
+		await expect(minimap(page)).toBeHidden();
+		await expect(hint(page)).toHaveText('Click to turn on magnifier');
+		await picture(page).click();
+		await move(0.6, 0.5);
+		await expect(glass(page)).toBeVisible();
 
-		// Near the bottom-right the minimap moves to the left and does not overlap the glass.
-		await move(0.95, 0.95);
-		await expect
-			.poll(async () => (await minimap.boundingBox())!.x)
-			.toBeLessThan(box.x + box.width / 2);
-		const m = (await minimap.boundingBox())!;
-		const g = (await glass(page).boundingBox())!;
-		const overlaps =
-			g.x < m.x + m.width && g.x + g.width > m.x && g.y < m.y + m.height && g.y + g.height > m.y;
-		expect(overlaps).toBe(false);
-
-		// It stays on screen when the image is partly scrolled off.
-		await page.evaluate(() => window.scrollTo(0, 300));
-		await move(0.3, 0.3);
-		await expect(minimap).toBeVisible();
-		const scrolled = (await minimap.boundingBox())!;
-		expect(scrolled.y).toBeGreaterThanOrEqual(0);
-		expect(scrolled.y + scrolled.height).toBeLessThanOrEqual(800);
-		expect(scrolled.x + scrolled.width).toBeLessThanOrEqual(1280);
-
-		// Hidden after pointerleave and after toggling off.
-		await target(page).dispatchEvent('pointerleave', { pointerType: 'mouse' });
-		await expect(minimap).toBeHidden();
-		await move(0.3, 0.3);
-		await expect(minimap).toBeVisible();
-		await target(page).click();
-		await expect(minimap).toBeHidden();
-		expect(requested.filter((u) => u.includes('~orig')).length).toBeLessThanOrEqual(1);
+		await picture(page).dispatchEvent('pointerleave', { pointerType: 'mouse' });
+		await expect(glass(page)).toBeHidden();
+		await expect(hint(page)).toBeHidden();
 	});
 
-	test('ctrl+wheel resizes the glass, plain wheel zooms it, and a hint explains', async ({
+	// Records the lightbox picture's entrance animations; `pause` holds them so tests can inspect them.
+	const watchAnimations = (page: Page, pause: boolean) =>
+		page.addInitScript((shouldPause) => {
+			const w = window as unknown as { __anims: Animation[] };
+			w.__anims = [];
+			const original = Element.prototype.animate;
+			Element.prototype.animate = function (
+				this: Element,
+				...args: Parameters<Element['animate']>
+			) {
+				const animation = original.apply(this, args);
+				if (this.getAttribute('data-testid') === 'lightbox-picture') {
+					w.__anims.push(animation);
+					if (shouldPause) animation.pause();
+				}
+				return animation;
+			};
+		}, pause);
+
+	test('the picture animates in from the page image; the glass waits until it ends', async ({
 		page
 	}) => {
 		test.setTimeout(60_000);
+		const requested: string[] = [];
+		await watchAnimations(page, true);
 		await page.setViewportSize({ width: 1280, height: 800 });
-		await page.goto(DETAIL);
-		await expect(page.locator('main picture img').first()).toBeAttached();
-		await page.waitForLoadState('networkidle');
-		const hint = page.getByTestId('magnifier-hint');
-		await expect(hint).toBeHidden();
-		const box = (await target(page).boundingBox())!;
-		const cx = box.x + box.width * 0.5;
-		const cy = box.y + box.height * 0.5;
-		await page.mouse.move(cx - 3, cy);
-		await page.mouse.move(cx, cy);
+		await load(page, requested);
+		const pageRect = (await trigger(page).locator('img').boundingBox())!;
+		// Click near the page image's centre and leave the mouse there.
+		await page.mouse.click(pageRect.x + pageRect.width / 2, pageRect.y + pageRect.height / 2);
+		await expect(dialog(page)).toBeVisible();
+
+		const info = await page.evaluate(() => {
+			const a = (window as unknown as { __anims: Animation[] }).__anims[0];
+			const frames = (a.effect as KeyframeEffect).getKeyframes();
+			const el = document.querySelector('[data-testid="lightbox-picture"]')!;
+			const r = el.getBoundingClientRect();
+			return {
+				count: (window as unknown as { __anims: Animation[] }).__anims.length,
+				state: a.playState,
+				transforms: frames.map((f) => String(f.transform)),
+				duration: (a.effect as KeyframeEffect).getTiming().duration,
+				start: { x: r.x, y: r.y, w: r.width, h: r.height }
+			};
+		});
+		expect(info.count).toBe(1);
+		expect(info.state).toBe('paused');
+		expect(info.duration).toBe(280);
+		expect(info.transforms[0]).toContain('scale');
+		expect(info.transforms[1]).toBe('none');
+		// The first frame sits on the page image.
+		expect(Math.abs(info.start.x - pageRect.x)).toBeLessThanOrEqual(1);
+		expect(Math.abs(info.start.y - pageRect.y)).toBeLessThanOrEqual(1);
+		expect(Math.abs(info.start.w - pageRect.width)).toBeLessThanOrEqual(1);
+
+		// No glass while it is moving, even with the mouse over the picture.
+		await page.mouse.move(640, 400);
+		await page.mouse.move(645, 400);
+		await page.waitForTimeout(200);
+		await expect(glass(page)).toHaveCount(0);
+
+		// When it ends the glass shows without another mouse move.
+		const end = await page.evaluate(async () => {
+			const a = (window as unknown as { __anims: Animation[] }).__anims[0];
+			a.play();
+			await a.finished;
+			const r = document.querySelector('[data-testid="lightbox-picture"]')!.getBoundingClientRect();
+			return { x: r.x, y: r.y, w: r.width, h: r.height, state: a.playState };
+		});
+		expect(end.state).toBe('finished');
+		expect(end.x).toBeGreaterThanOrEqual(0);
+		expect(end.y).toBeGreaterThanOrEqual(0);
+		expect(end.x + end.w).toBeLessThanOrEqual(1280);
+		expect(end.y + end.h).toBeLessThanOrEqual(800);
 		await expect(glass(page)).toBeVisible();
-		await expect(hint).toHaveText('Scroll to zoom · Ctrl + scroll to resize · Click to turn off');
+		await expect(hint(page)).toBeVisible();
+	});
 
-		const glassWidth = async () => (await glass(page).boundingBox())!.width;
-		const innerWidth = () => glassImg(page).evaluate((el) => el.getBoundingClientRect().width);
-		const resize = async (deltaY: number) => {
-			await page.keyboard.down('Control');
-			await page.mouse.wheel(0, deltaY);
-			await page.keyboard.up('Control');
-		};
+	test('Esc during the animation closes it and reopening animates again', async ({ page }) => {
+		const requested: string[] = [];
+		await watchAnimations(page, true);
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await load(page, requested);
+		await trigger(page).click();
+		await expect(dialog(page)).toBeVisible();
+		await page.keyboard.press('Escape');
+		await expect(dialog(page)).toBeHidden();
+		await expect(trigger(page)).toBeFocused();
+		await trigger(page).click();
+		await expect(dialog(page)).toBeVisible();
+		const state = await page.evaluate(async () => {
+			const anims = (window as unknown as { __anims: Animation[] }).__anims;
+			const a = anims[anims.length - 1];
+			const before = a.playState;
+			a.play();
+			await a.finished;
+			return { count: anims.length, before, after: a.playState };
+		});
+		expect(state).toEqual({ count: 2, before: 'paused', after: 'finished' });
+	});
 
-		expect(await glassWidth()).toBeCloseTo(260, 0);
-		const inner0 = await innerWidth();
-		await resize(-200);
-		await expect.poll(glassWidth).toBeGreaterThan(260);
-		expect(await innerWidth()).toBeCloseTo(inner0, 0);
-		expect(await page.evaluate(() => window.scrollY)).toBe(0);
-		// Still centred on the cursor.
-		const g = (await glass(page).boundingBox())!;
-		expect(Math.abs(g.x + g.width / 2 - cx)).toBeLessThanOrEqual(1);
-		expect(Math.abs(g.y + g.height / 2 - cy)).toBeLessThanOrEqual(1);
-
-		// Plain wheel zooms and leaves the size alone.
-		const size = await glassWidth();
-		await page.mouse.wheel(0, -200);
-		await expect.poll(innerWidth).toBeGreaterThan(inner0);
-		expect(await glassWidth()).toBeCloseTo(size, 0);
-
-		// Limits.
-		for (let i = 0; i < 6; i++) await resize(-2000);
-		await expect.poll(glassWidth).toBeCloseTo(520, 0);
-		// The minimap keeps clear of the (now larger) glass.
-		const gl = (await glass(page).boundingBox())!;
-		const mm = (await page.getByTestId('magnifier-minimap').boundingBox())!;
-		const gcx = gl.x + gl.width / 2;
-		const gcy = gl.y + gl.height / 2;
-		const nx = Math.min(mm.x + mm.width, Math.max(mm.x, gcx));
-		const ny = Math.min(mm.y + mm.height, Math.max(mm.y, gcy));
-		expect(Math.hypot(gcx - nx, gcy - ny)).toBeGreaterThanOrEqual(gl.width / 2);
-		for (let i = 0; i < 6; i++) await resize(2000);
-		await expect.poll(glassWidth).toBeCloseTo(140, 0);
-		await resize(-200);
-		await page.screenshot({ path: 'test-results/lens-resized.png' });
-
-		// The size survives leaving, re-entering and toggling.
-		const kept = await glassWidth();
-		await target(page).dispatchEvent('pointerleave', { pointerType: 'mouse' });
-		await expect(glass(page)).toBeHidden();
-		await expect(hint).toBeHidden();
-		await page.mouse.move(cx + 3, cy);
-		await expect(glass(page)).toBeVisible();
-		expect(await glassWidth()).toBeCloseTo(kept, 0);
-
-		// Click: the hint changes to the off text.
-		await target(page).click();
-		await expect(glass(page)).toBeHidden();
-		await expect(hint).toHaveText('Click to turn on magnifier');
-		await target(page).click();
-		await page.mouse.move(cx, cy);
-		await expect(glass(page)).toBeVisible();
-		expect(await glassWidth()).toBeCloseTo(kept, 0);
+	test('reduced motion opens without a movement animation', async ({ page }) => {
+		const requested: string[] = [];
+		await page.emulateMedia({ reducedMotion: 'reduce' });
+		await watchAnimations(page, false);
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await load(page, requested);
+		await trigger(page).click();
+		await expect(dialog(page)).toBeVisible();
+		const keyframes = await page.evaluate(() =>
+			(window as unknown as { __anims: Animation[] }).__anims.flatMap((a) =>
+				(a.effect as KeyframeEffect).getKeyframes().map((f) => Object.keys(f))
+			)
+		);
+		expect(keyframes.length).toBeGreaterThan(0);
+		expect(keyframes.flat()).not.toContain('transform');
 	});
 
 	test.describe('touch', () => {
 		test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
-		test('tapping shows no glass and downloads no original', async ({ page }) => {
+		test('tap opens the lightbox with no glass, minimap or hint', async ({ page }) => {
 			const requested: string[] = [];
-			page.on('request', (req) => requested.push(req.url()));
-			await page.goto(DETAIL);
-			await expect(page.locator('main picture img').first()).toBeAttached();
-			await target(page).tap();
-			await page.waitForTimeout(500);
+			await load(page, requested);
+			await trigger(page).tap();
+			await expect(dialog(page)).toBeVisible();
+			await expect.poll(() => orig(requested).length).toBeGreaterThan(0);
+			await picture(page).tap();
+			await page.waitForTimeout(400);
+			await expect(dialog(page)).toBeVisible();
 			await expect(glass(page)).toHaveCount(0);
-			await expect(page.getByTestId('magnifier-minimap')).toHaveCount(0);
-			await expect(page.getByTestId('magnifier-hint')).toHaveCount(0);
-			expect(requested.filter((u) => u.includes('~orig'))).toEqual([]);
+			await expect(minimap(page)).toHaveCount(0);
+			await expect(hint(page)).toHaveCount(0);
+			await closeButton(page).tap();
+			await expect(dialog(page)).toBeHidden();
 		});
 	});
 });

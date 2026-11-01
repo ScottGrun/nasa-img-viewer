@@ -1,8 +1,9 @@
 <script lang="ts">
+	import type { ComponentProps } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import Image from '#lib/components/Image.svelte';
-	import ImageMagnifier from '#lib/components/ImageMagnifier.svelte';
+	import ImageLightbox from '#lib/components/ImageLightbox.svelte';
 	import ImageTag from '#lib/components/ImageTag.svelte';
 	import { twMerge } from 'tailwind-merge';
 	import type { PageData } from './$types';
@@ -25,6 +26,29 @@
 	const originalWidth = $derived(
 		Number(metadata['EXIF:ImageWidth'] ?? metadata['File:ImageWidth'] ?? Number.NaN)
 	);
+
+	let trigger: HTMLButtonElement | undefined = $state(undefined);
+	let lightbox: ComponentProps<typeof ImageLightbox>['initial'] | null = $state(null);
+
+	const openLightbox = (event: MouseEvent) => {
+		const img = trigger?.querySelector('img');
+		if (!img?.currentSrc) return;
+		const rect = img.getBoundingClientRect();
+		const pointerType = (event as PointerEvent).pointerType;
+		lightbox = {
+			src: img.currentSrc,
+			aspect: img.naturalWidth / img.naturalHeight || width / height,
+			rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+			pointer:
+				pointerType === 'mouse' || pointerType === 'pen'
+					? { x: event.clientX, y: event.clientY }
+					: undefined
+		};
+	};
+	const closeLightbox = () => {
+		lightbox = null;
+		trigger?.focus();
+	};
 
 	const photographer = $derived(metadata['AVAIL:Photographer']);
 	const location = $derived(metadata['AVAIL:Location']);
@@ -62,16 +86,31 @@
 	<main class={twMerge('grid gap-4', 'lg:grid-cols-[1fr_400px]')}>
 		<div>
 			{#key page.params.nasaId}
-				<ImageMagnifier images={asset.items} {originalWidth}>
+				<button
+					bind:this={trigger}
+					type="button"
+					aria-label="View full screen"
+					class="m-0 block w-full cursor-zoom-in border-0 bg-transparent p-0"
+					onclick={openLightbox}
+				>
 					<Image
 						images={asset.items}
 						alt={metadata['EXIF:ImageDescription']}
-						class="mx-auto  block rounded-lg"
+						class="mx-auto block rounded-lg"
 						loading="eager"
 						fetchpriority="high"
 						aspectRatio={width / height}
 					/>
-				</ImageMagnifier>
+				</button>
+				{#if lightbox}
+					<ImageLightbox
+						images={asset.items}
+						alt={metadata['EXIF:ImageDescription']}
+						{originalWidth}
+						initial={lightbox}
+						onclose={closeLightbox}
+					/>
+				{/if}
 			{/key}
 		</div>
 

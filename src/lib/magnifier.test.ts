@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	clampLens,
 	clampZoom,
+	fitSize,
 	defaultZoom,
 	maxZoom,
 	minimapMarker,
@@ -108,5 +109,21 @@ describe('glass size', () => {
 		expect(wheelLens(260, 100, big)).toBeLessThan(260);
 		expect(wheelLens(260, -100000, big)).toBe(520);
 		expect(wheelLens(260, 100000, big)).toBe(140);
+	});
+});
+
+describe('fitSize', () => {
+	it('fits the viewport keeping the aspect ratio', () => {
+		const wide = fitSize(1.5, { w: 1280, h: 800 });
+		expect(wide.w).toBeCloseTo(1104);
+		expect(wide.h).toBeCloseTo(736);
+		const tall = fitSize(0.5, { w: 1280, h: 800 });
+		expect(tall.h).toBeCloseTo(736);
+		expect(tall.w).toBeCloseTo(368);
+	});
+
+	it('does not exceed the image pixel width and tolerates bad input', () => {
+		expect(fitSize(2, { w: 1280, h: 800 }, 500)).toEqual({ w: 500, h: 250 });
+		expect(fitSize(Number.NaN, { w: 400, h: 400 }).w).toBe(336);
 	});
 });

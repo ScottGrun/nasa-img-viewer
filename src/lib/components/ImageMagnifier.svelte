@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { pickBySize } from '#lib/images.js';
 	import { fade } from 'svelte/transition';
 	import {
 		clampLens,
@@ -17,16 +16,32 @@
 		wheelZoom,
 		type MinimapCorner
 	} from '#lib/magnifier.js';
-	import type { AssetManifestItem } from '#lib/types.js';
 
 	interface Props {
-		images: AssetManifestItem[];
-		/** Original pixel width from metadata, used until the original has loaded. */
-		originalWidth?: number;
+		/** Image shown in the glass: the sharpest version loaded so far. */
+		src: string;
+		/** Image for the minimap thumbnail; an already loaded one, never the original. */
+		thumbSrc: string;
+		/** Pixel width of `src`'s full-resolution image, as far as is known. */
+		sourceWidth?: number;
+		/** Whether a sharper version is still on its way. */
+		loading?: boolean;
+		/** Appended to the hint while the glass is on. */
+		hintExtra?: string;
+		/** While true (e.g. during an entrance animation) the glass stays off. */
+		suspended?: boolean;
 		children: Snippet;
 	}
 
-	const { images, originalWidth, children }: Props = $props();
+	const {
+		src,
+		thumbSrc,
+		sourceWidth,
+		loading = false,
+		hintExtra = '',
+		suspended = false,
+		children
+	}: Props = $props();
 
 	type Spot = { x: number; y: number; clientX: number; clientY: number; w: number; h: number };
 
@@ -39,43 +54,18 @@
 			? 0
 			: 200;
 
-	interface Connection {
-		saveData?: boolean;
-	}
-
-	const hrefs = $derived(images.map((image) => image.href));
-	const saveData =
-		typeof navigator === 'undefined'
-			? undefined
-			: (navigator as Navigator & { connection?: Connection }).connection?.saveData;
-	const magnifySrc = $derived(
-		pickBySize(
-			hrefs,
-			saveData
-				? ['large', 'medium', 'small', 'thumb']
-				: ['orig', 'large', 'medium', 'small', 'thumb']
-		)
-	);
-
 	let button: HTMLButtonElement | undefined = $state(undefined);
 	let enabled = $state(true);
-	/** Set on the first mouse hover; the original is not requested before that. */
-	let wanted = $state(false);
-	let loadedSrc: string | undefined = $state(undefined);
-	let loadedWidth: number | undefined = $state(undefined);
-	let failed = $state(false);
 	let corner: MinimapCorner = $state('right');
 	/** Glass diameter the user chose; persists until the image changes. */
 	let lens = $state(DEFAULT_LENS);
 	let userZoom: number | undefined = $state(undefined);
-	let displaySrc: string | undefined = $state(undefined);
 	/** Pointer position relative to the image plus the image's size; null hides the glass. */
 	let spot = $state<Spot | null>(null);
 
-	const native = $derived(nativeZoom(loadedWidth ?? originalWidth, spot?.w));
+	const native = $derived(nativeZoom(sourceWidth, spot?.w));
 	const zoom = $derived(clampZoom(userZoom ?? defaultZoom(native), native));
 	const active = $derived(enabled && spot !== null);
-	const loading = $derived(wanted && !loadedSrc && !failed);
 
 	const isMouse = (event: PointerEvent) =>
 		event.pointerType === 'mouse' || event.pointerType === 'pen';
@@ -84,7 +74,6 @@
 		if (!button) return;
 		const rect = button.getBoundingClientRect();
 		if (rect.width === 0 || rect.height === 0) return;
-		displaySrc = button.querySelector('img')?.currentSrc || displaySrc;
 		spot = {
 			x: clientX - rect.left,
 			y: clientY - rect.top,
@@ -108,9 +97,20 @@
 	};
 
 	const onPointer = (event: PointerEvent) => {
-		if (!isMouse(event)) return;
-		wanted = true;
+		if (suspended || !isMouse(event)) return;
 		track(event.clientX, event.clientY);
+	};
+
+	/** Shows the glass at a known mouse position without waiting for the next move. */
+	export const activateAt = (clientX: number, clientY: number) => {
+		if (suspended || !button) return;
+		const rect = button.getBoundingClientRect();
+		const inside =
+			clientX >= rect.left &&
+			clientX <= rect.right &&
+			clientY >= rect.top &&
+			clientY <= rect.bottom;
+		if (inside) track(clientX, clientY);
 	};
 
 	const onLeave = (event: PointerEvent) => {
@@ -122,34 +122,12 @@
 		enabled = !enabled;
 	};
 
-	// Load the high-resolution version once, after the first hover.
-	$effect(() => {
-		const src = magnifySrc;
-		if (!wanted || !src) return;
-		let stale = false;
-		const img = new Image();
-		img.src = src;
-		img
-			.decode()
-			.then(() => {
-				if (stale) return;
-				loadedWidth = img.naturalWidth;
-				loadedSrc = src;
-			})
-			.catch(() => {
-				if (!stale) failed = true;
-			});
-		return () => {
-			stale = true;
-		};
-	});
-
 	// Non-passive wheel listener so the page can be kept from scrolling while the glass is active.
 	$effect(() => {
 		const el = button;
 		if (!el) return;
 		const onWheel = (event: WheelEvent) => {
-			if (!enabled || spot === null) return;
+			if (suspended || !enabled || spot === null) return;
 			event.preventDefault();
 			if (event.ctrlKey || event.metaKey) lens = wheelLens(lens, event.deltaY, viewport());
 			else userZoom = wheelZoom(zoom, event.deltaY, native);
@@ -180,7 +158,7 @@
 	type="button"
 	aria-label="Toggle image magnifier"
 	aria-pressed={enabled}
-	class="m-0 block w-full border-0 bg-transparent p-0 {active
+	class="m-0 block h-full w-full border-0 bg-transparent p-0 {active
 		? 'cursor-none'
 		: enabled
 			? 'cursor-default'
@@ -207,7 +185,7 @@
 			style="transform:translate({hintBox.left + 12}px,{hintBox.top + 12}px)"
 		>
 			{enabled
-				? 'Scroll to zoom · Ctrl + scroll to resize · Click to turn off'
+				? `Scroll to zoom · Ctrl + scroll to resize · Click to turn off${hintExtra}`
 				: 'Click to turn on magnifier'}
 		</div>
 	{/if}
@@ -224,14 +202,14 @@
 		{ w: document.documentElement.clientWidth, h: document.documentElement.clientHeight }
 	)}
 	{@const origin = visible ? minimapOrigin(visible, map, corner) : undefined}
-	{#if origin && displaySrc}
+	{#if origin}
 		<div
 			aria-hidden="true"
 			data-testid="magnifier-minimap"
 			class="pointer-events-none fixed top-0 left-0 z-40 overflow-hidden rounded-md border border-white bg-neutral-50 shadow-lg ring-1 ring-black/20"
 			style="width:{map.w}px;height:{map.h}px;transform:translate({origin.left}px,{origin.top}px)"
 		>
-			<img src={displaySrc} alt="" class="block size-full max-w-none" />
+			<img src={thumbSrc} alt="" class="block size-full max-w-none" />
 			<div
 				data-testid="magnifier-marker"
 				class="absolute top-0 left-0 rounded-full border-2 border-white outline outline-1 outline-black/60"
@@ -240,7 +218,6 @@
 			></div>
 		</div>
 	{/if}
-	{@const shown = loadedSrc ?? displaySrc}
 	<div
 		aria-hidden="true"
 		data-testid="magnifier-glass"
@@ -248,15 +225,13 @@
 		style="width:{diameter}px;height:{diameter}px;transform:translate({spot.clientX -
 			radius}px,{spot.clientY - radius}px)"
 	>
-		{#if shown}
-			<img
-				src={shown}
-				alt=""
-				class="absolute top-0 left-0 max-w-none select-none"
-				style="width:{spot.w * zoom}px;height:{spot.h * zoom}px;transform:translate({radius -
-					spot.x * zoom}px,{radius - spot.y * zoom}px)"
-			/>
-		{/if}
+		<img
+			{src}
+			alt=""
+			class="absolute top-0 left-0 max-w-none select-none"
+			style="width:{spot.w * zoom}px;height:{spot.h * zoom}px;transform:translate({radius -
+				spot.x * zoom}px,{radius - spot.y * zoom}px)"
+		/>
 		{#if loading}
 			<div
 				class="absolute right-3 bottom-3 size-5 animate-spin rounded-full border-2 border-white/40 border-t-white drop-shadow"
