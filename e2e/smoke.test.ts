@@ -444,6 +444,87 @@ test.describe('image magnifier', () => {
 		await expect(glass(page)).toBeHidden();
 	});
 
+	test('minimap shows where the glass is and avoids being covered', async ({ page }) => {
+		test.setTimeout(60_000);
+		const requested: string[] = [];
+		page.on('request', (req) => requested.push(req.url()));
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await page.goto(DETAIL);
+		await expect(page.locator('main picture img').first()).toBeAttached();
+		await page.waitForLoadState('networkidle');
+		const minimap = page.getByTestId('magnifier-minimap');
+		const marker = page.getByTestId('magnifier-marker');
+		await expect(minimap).toBeHidden();
+
+		const box = (await target(page).boundingBox())!;
+		const move = async (fx: number, fy: number) => {
+			await page.mouse.move(box.x + box.width * fx - 3, box.y + box.height * fy);
+			await page.mouse.move(box.x + box.width * fx, box.y + box.height * fy);
+		};
+		const fraction = async () => {
+			const m = (await minimap.boundingBox())!;
+			const k = (await marker.boundingBox())!;
+			return {
+				fx: (k.x + k.width / 2 - m.x) / m.width,
+				fy: (k.y + k.height / 2 - m.y) / m.height
+			};
+		};
+
+		await move(0.2, 0.3);
+		await expect(minimap).toBeVisible();
+		// No extra download: the thumbnail is the main image's own source.
+		const mainSrc = await page
+			.locator('main picture img')
+			.first()
+			.evaluate((el: HTMLImageElement) => el.currentSrc);
+		await expect(minimap.locator('img')).toHaveAttribute('src', mainSrc);
+		expect(mainSrc).not.toContain('~orig');
+		const size = (await minimap.boundingBox())!;
+		expect(Math.max(size.width, size.height)).toBeCloseTo(160, 0);
+
+		let f = await fraction();
+		expect(f.fx).toBeCloseTo(0.2, 1);
+		expect(f.fy).toBeCloseTo(0.3, 1);
+		await move(0.8, 0.5);
+		f = await fraction();
+		expect(f.fx).toBeCloseTo(0.8, 1);
+		expect(f.fy).toBeCloseTo(0.5, 1);
+
+		// Zooming in shrinks the marker.
+		const before = (await marker.boundingBox())!.width;
+		await page.mouse.wheel(0, -300);
+		await expect.poll(async () => (await marker.boundingBox())!.width).toBeLessThan(before);
+
+		// Near the bottom-right the minimap moves to the left and does not overlap the glass.
+		await move(0.95, 0.95);
+		await expect
+			.poll(async () => (await minimap.boundingBox())!.x)
+			.toBeLessThan(box.x + box.width / 2);
+		const m = (await minimap.boundingBox())!;
+		const g = (await glass(page).boundingBox())!;
+		const overlaps =
+			g.x < m.x + m.width && g.x + g.width > m.x && g.y < m.y + m.height && g.y + g.height > m.y;
+		expect(overlaps).toBe(false);
+
+		// It stays on screen when the image is partly scrolled off.
+		await page.evaluate(() => window.scrollTo(0, 300));
+		await move(0.3, 0.3);
+		await expect(minimap).toBeVisible();
+		const scrolled = (await minimap.boundingBox())!;
+		expect(scrolled.y).toBeGreaterThanOrEqual(0);
+		expect(scrolled.y + scrolled.height).toBeLessThanOrEqual(800);
+		expect(scrolled.x + scrolled.width).toBeLessThanOrEqual(1280);
+
+		// Hidden after pointerleave and after toggling off.
+		await target(page).dispatchEvent('pointerleave', { pointerType: 'mouse' });
+		await expect(minimap).toBeHidden();
+		await move(0.3, 0.3);
+		await expect(minimap).toBeVisible();
+		await target(page).click();
+		await expect(minimap).toBeHidden();
+		expect(requested.filter((u) => u.includes('~orig')).length).toBeLessThanOrEqual(1);
+	});
+
 	test.describe('touch', () => {
 		test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
@@ -455,6 +536,7 @@ test.describe('image magnifier', () => {
 			await target(page).tap();
 			await page.waitForTimeout(500);
 			await expect(glass(page)).toHaveCount(0);
+			await expect(page.getByTestId('magnifier-minimap')).toHaveCount(0);
 			expect(requested.filter((u) => u.includes('~orig'))).toEqual([]);
 		});
 	});

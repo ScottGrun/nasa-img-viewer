@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { clampZoom, defaultZoom, maxZoom, nativeZoom, wheelZoom } from './magnifier.js';
+import {
+	clampZoom,
+	defaultZoom,
+	maxZoom,
+	minimapMarker,
+	minimapOrigin,
+	minimapSize,
+	nativeZoom,
+	nextMinimapCorner,
+	visibleBox,
+	wheelZoom
+} from './magnifier.js';
 
 describe('magnifier zoom', () => {
 	it('computes native zoom only from known sizes', () => {
@@ -30,5 +41,52 @@ describe('magnifier zoom', () => {
 		expect(wheelZoom(3, 100, undefined)).toBeLessThan(3);
 		expect(wheelZoom(3, -10000, undefined)).toBe(4);
 		expect(wheelZoom(3, 10000, undefined)).toBe(1.5);
+	});
+});
+
+describe('minimap', () => {
+	const map = minimapSize({ w: 800, h: 400 });
+
+	it('sizes by the longest side', () => {
+		expect(map).toEqual({ w: 160, h: 80 });
+		expect(minimapSize({ w: 400, h: 800 })).toEqual({ w: 80, h: 160 });
+	});
+
+	it('places the marker from the cursor fraction and shrinks with zoom', () => {
+		const a = minimapMarker({ x: 200, y: 100 }, { w: 800, h: 400 }, 2, 260, map);
+		expect(a.cx).toBeCloseTo(40);
+		expect(a.cy).toBeCloseTo(20);
+		expect(a.d).toBeCloseTo(26);
+		const b = minimapMarker({ x: 200, y: 100 }, { w: 800, h: 400 }, 4, 260, map);
+		expect(b.d).toBeCloseTo(13);
+		expect(minimapMarker({ x: 0, y: 0 }, { w: 800, h: 400 }, 16, 260, map).d).toBe(6);
+	});
+
+	it('intersects the image with the viewport', () => {
+		const view = { w: 1000, h: 500 };
+		expect(visibleBox({ left: 0, top: -200, w: 800, h: 1000 }, view)).toEqual({
+			left: 0,
+			top: 0,
+			w: 800,
+			h: 500
+		});
+		expect(visibleBox({ left: 0, top: 600, w: 10, h: 10 }, view)).toBeUndefined();
+	});
+
+	it('anchors to the chosen bottom corner', () => {
+		const visible = { left: 0, top: 0, w: 800, h: 500 };
+		expect(minimapOrigin(visible, map, 'right')).toEqual({ left: 628, top: 408 });
+		expect(minimapOrigin(visible, map, 'left')).toEqual({ left: 12, top: 408 });
+	});
+
+	it('flips left near the corner and returns only after the margin', () => {
+		const visible = { left: 0, top: 0, w: 800, h: 500 };
+		const at = (cx: number) => ({ cx, cy: 450, r: 130 });
+		// the bottom-right box spans x 628..788
+		expect(nextMinimapCorner('right', at(400), visible, map)).toBe('right');
+		expect(nextMinimapCorner('right', at(520), visible, map)).toBe('left');
+		// 628 - 130 = 498: touching, so within the margin it stays left
+		expect(nextMinimapCorner('left', at(480), visible, map)).toBe('left');
+		expect(nextMinimapCorner('left', at(460), visible, map)).toBe('right');
 	});
 });

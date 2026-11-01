@@ -31,3 +31,91 @@ export const defaultZoom = (native: number | undefined) =>
 /** Multiplicative wheel zoom: scrolling up (negative deltaY) zooms in. */
 export const wheelZoom = (zoom: number, deltaY: number, native: number | undefined) =>
 	clampZoom(zoom * Math.exp(-deltaY * WHEEL_SENSITIVITY), native);
+
+export const MINIMAP_LONGEST_SIDE = 160;
+export const MINIMAP_INSET = 12;
+export const MINIMAP_HYSTERESIS = 24;
+const MIN_MARKER = 6;
+
+export interface Size {
+	w: number;
+	h: number;
+}
+
+export interface Box {
+	left: number;
+	top: number;
+	w: number;
+	h: number;
+}
+
+export type MinimapCorner = 'right' | 'left';
+
+/** Minimap size: the image's aspect ratio with its longest side at `longest` pixels. */
+export const minimapSize = (display: Size, longest = MINIMAP_LONGEST_SIDE): Size => {
+	const scale = longest / Math.max(display.w, display.h);
+	return { w: display.w * scale, h: display.h * scale };
+};
+
+/**
+ * Marker circle in minimap pixels. The centre is the cursor as a fraction of the image;
+ * the diameter is the lens's footprint on the image (`lens / zoom` displayed pixels), scaled down.
+ */
+export const minimapMarker = (
+	point: { x: number; y: number },
+	display: Size,
+	zoom: number,
+	lens: number,
+	map: Size
+) => ({
+	cx: (point.x / display.w) * map.w,
+	cy: (point.y / display.h) * map.h,
+	d: Math.max(MIN_MARKER, (lens / zoom) * (map.w / display.w))
+});
+
+/** The part of `box` that is inside a viewport at the origin; undefined if none. */
+export const visibleBox = (box: Box, viewport: Size): Box | undefined => {
+	const left = Math.max(0, box.left);
+	const top = Math.max(0, box.top);
+	const right = Math.min(viewport.w, box.left + box.w);
+	const bottom = Math.min(viewport.h, box.top + box.h);
+	return right > left && bottom > top ? { left, top, w: right - left, h: bottom - top } : undefined;
+};
+
+/** Top-left of the minimap inside the visible part of the image, `inset` from the chosen bottom corner. */
+export const minimapOrigin = (
+	visible: Box,
+	map: Size,
+	corner: MinimapCorner,
+	inset = MINIMAP_INSET
+) => ({
+	left: corner === 'right' ? visible.left + visible.w - inset - map.w : visible.left + inset,
+	top: visible.top + visible.h - inset - map.h
+});
+
+/** Whether a circle comes within `margin` pixels of a box. */
+export const circleNearBox = (
+	circle: { cx: number; cy: number; r: number },
+	box: Box,
+	margin = 0
+) => {
+	const nx = Math.min(box.left + box.w, Math.max(box.left, circle.cx));
+	const ny = Math.min(box.top + box.h, Math.max(box.top, circle.cy));
+	return Math.hypot(circle.cx - nx, circle.cy - ny) < circle.r + margin;
+};
+
+/**
+ * Moves the minimap left when the glass would cover its default bottom-right spot, and only
+ * moves it back once the glass has cleared that spot by `hysteresis`, so it doesn't flicker.
+ */
+export const nextMinimapCorner = (
+	previous: MinimapCorner,
+	glass: { cx: number; cy: number; r: number },
+	visible: Box,
+	map: Size,
+	hysteresis = MINIMAP_HYSTERESIS
+): MinimapCorner => {
+	const origin = minimapOrigin(visible, map, 'right');
+	const spot: Box = { ...origin, w: map.w, h: map.h };
+	return circleNearBox(glass, spot, previous === 'right' ? 0 : hysteresis) ? 'left' : 'right';
+};

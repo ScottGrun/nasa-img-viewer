@@ -1,7 +1,18 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { pickBySize } from '#lib/images.js';
-	import { defaultZoom, nativeZoom, wheelZoom, clampZoom } from '#lib/magnifier.js';
+	import {
+		clampZoom,
+		defaultZoom,
+		minimapMarker,
+		minimapOrigin,
+		minimapSize,
+		nativeZoom,
+		nextMinimapCorner,
+		visibleBox,
+		wheelZoom,
+		type MinimapCorner
+	} from '#lib/magnifier.js';
 	import type { AssetManifestItem } from '#lib/types.js';
 
 	interface Props {
@@ -43,6 +54,7 @@
 	let loadedSrc: string | undefined = $state(undefined);
 	let loadedWidth: number | undefined = $state(undefined);
 	let failed = $state(false);
+	let corner: MinimapCorner = $state('right');
 	let userZoom: number | undefined = $state(undefined);
 	let displaySrc: string | undefined = $state(undefined);
 	/** Pointer position relative to the image plus the image's size; null hides the glass. */
@@ -69,6 +81,18 @@
 			w: rect.width,
 			h: rect.height
 		};
+		const visible = visibleBox(
+			{ left: rect.left, top: rect.top, w: rect.width, h: rect.height },
+			{ w: document.documentElement.clientWidth, h: document.documentElement.clientHeight }
+		);
+		if (visible) {
+			corner = nextMinimapCorner(
+				corner,
+				{ cx: clientX, cy: clientY, r: RADIUS },
+				visible,
+				minimapSize({ w: rect.width, h: rect.height })
+			);
+		}
 	};
 
 	const onPointer = (event: PointerEvent) => {
@@ -157,6 +181,30 @@
 </button>
 
 {#if active && spot}
+	{@const display = { w: spot.w, h: spot.h }}
+	{@const map = minimapSize(display)}
+	{@const marker = minimapMarker(spot, display, zoom, DIAMETER, map)}
+	{@const visible = visibleBox(
+		{ left: spot.clientX - spot.x, top: spot.clientY - spot.y, w: spot.w, h: spot.h },
+		{ w: document.documentElement.clientWidth, h: document.documentElement.clientHeight }
+	)}
+	{@const origin = visible ? minimapOrigin(visible, map, corner) : undefined}
+	{#if origin && displaySrc}
+		<div
+			aria-hidden="true"
+			data-testid="magnifier-minimap"
+			class="pointer-events-none fixed top-0 left-0 z-40 overflow-hidden rounded-md border border-white bg-neutral-50 shadow-lg ring-1 ring-black/20"
+			style="width:{map.w}px;height:{map.h}px;transform:translate({origin.left}px,{origin.top}px)"
+		>
+			<img src={displaySrc} alt="" class="block size-full max-w-none" />
+			<div
+				data-testid="magnifier-marker"
+				class="absolute top-0 left-0 rounded-full border-2 border-white outline outline-1 outline-black/60"
+				style="width:{marker.d}px;height:{marker.d}px;transform:translate({marker.cx -
+					marker.d / 2}px,{marker.cy - marker.d / 2}px);box-shadow:0 0 0 999px rgba(0,0,0,0.45)"
+			></div>
+		</div>
+	{/if}
 	{@const shown = loadedSrc ?? displaySrc}
 	<div
 		aria-hidden="true"
