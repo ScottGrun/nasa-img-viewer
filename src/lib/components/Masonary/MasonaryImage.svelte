@@ -1,9 +1,7 @@
 <script lang="ts" module>
-	export interface MasonaryImageProps {
-		description: string;
-		url: string;
-		nasaId: string;
-		title: string;
+	import type { GalleryImage } from '#lib/images.js';
+
+	export interface MasonaryImageProps extends GalleryImage {
 		class?: string;
 	}
 </script>
@@ -13,11 +11,32 @@
 	import { twMerge } from 'tailwind-merge';
 	import Image from '../Image.svelte';
 
-	const { url, description, nasaId, title, class: className }: MasonaryImageProps = $props();
+	const {
+		src,
+		srcset,
+		width,
+		height,
+		description,
+		nasaId,
+		title,
+		class: className
+	}: MasonaryImageProps = $props();
 </script>
 
 <div class={twMerge('relative w-fit overflow-hidden rounded-md', className)}>
-	<Image src={url} alt={description} aria-labelledby={nasaId} class="w-full" />
+	<Image
+		{src}
+		{srcset}
+		{width}
+		{height}
+		sizes="(min-width: 1440px) 474px, (min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+		loading="lazy"
+		decoding="async"
+		aspectRatio={width && height ? width / height : undefined}
+		alt={description}
+		aria-labelledby={nasaId}
+		class="w-full"
+	/>
 	<div
 		class="group absolute bottom-0 z-10 flex h-full w-full flex-col bg-masonary-image-gradient p-5 font-semibold text-white opacity-0 transition-opacity duration-300 hover:opacity-100"
 	>

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { HTMLImgAttributes } from 'svelte/elements';
 	import { twMerge } from 'tailwind-merge';
+	import { pickBySize } from '#lib/images.js';
+	import type { AssetManifestItem } from '#lib/types.js';
 
 	interface Props extends Omit<HTMLImgAttributes, 'class'> {
 		class?: string;
@@ -8,9 +10,9 @@
 		aspectRatio?: number;
 	}
 
-	const { class: className, images, aspectRatio = 16 / 9, ...rest }: Props = $props();
+	const { class: className, images, aspectRatio, ...rest }: Props = $props();
 	// Derived from the prop, but overwritten with the measured ratio once the image loads
-	let naturalAspectRatio = $derived(aspectRatio);
+	let naturalAspectRatio = $derived(aspectRatio ?? 16 / 9);
 	let imageElement: HTMLImageElement | undefined = $state(undefined);
 	let imageLoaded = $state(false);
 
@@ -21,23 +23,10 @@
 		}
 	};
 
-	import type { AssetManifestItem } from '#lib/types.js';
-
-	// Function to get image by size suffix
-	const getImageBySize = (suffix: string) => {
-		return (
-			images && images.find((img) => img.href.includes(suffix) && !img.href.includes('tif'))?.href
-		);
-	};
-
-	// Get different image sizes
-	const large = $derived(getImageBySize('~orig') ?? getImageBySize('~large'));
-	const medium = $derived(getImageBySize('~medium'));
-	const small = $derived(getImageBySize('~small'));
-	const thumbnail = $derived(getImageBySize('~thumb'));
-
-	// Default fallback if no other sizes are available
-	const fallback = $derived(small || medium || large || thumbnail);
+	// Asset manifest: large on wide screens, medium otherwise. ~orig is only a last resort.
+	const hrefs = $derived((images ?? []).map((img) => img.href));
+	const large = $derived(pickBySize(hrefs, ['large', 'medium', 'small', 'thumb']));
+	const medium = $derived(pickBySize(hrefs, ['medium', 'large', 'small', 'thumb']));
 </script>
 
 <div
@@ -46,26 +35,14 @@
 >
 	{#if images && images.length > 0}
 		<picture>
-			<!-- Large screens -->
 			{#if large}
-				<source media="(min-width: 1200px)" srcset={large} />
+				<source media="(min-width: 768px)" srcset={large} />
 			{/if}
-
-			<!-- Medium screens -->
 			{#if medium}
-				<source media="(min-width: 768px)" srcset={medium} />
-			{/if}
-
-			<!-- Small screens -->
-			{#if small}
-				<source media="(min-width: 480px)" srcset={small} />
-			{/if}
-
-			<!-- Fallback image -->
-			{#if Boolean(fallback)}
 				<img
 					bind:this={imageElement}
 					onload={onLoad}
+					src={medium}
 					{...rest}
 					class={twMerge(
 						'absolute top-0 left-0 h-full w-full object-cover opacity-0 transition-all duration-600 ease-in',

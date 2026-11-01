@@ -36,42 +36,66 @@ test('home page shows different results after following a category link', async 
 	await expect.poll(async () => JSON.stringify(await hrefs(page))).not.toBe(JSON.stringify(before));
 });
 
-test('detail page updates when navigating between images via the related gallery', async ({
-	page
-}) => {
+const DETAIL = '/image/AFRC2026-0062-27';
+
+test('detail page shows related images and navigates to one', async ({ page }) => {
+	await page.goto(DETAIL);
+	await expect(page.locator('h1')).toBeVisible();
+	const related = page.locator('section:has(h2:text("Related images")) a[href^="/image/"]');
+	expect(await related.count()).toBeGreaterThan(0);
+	const href = await related.first().getAttribute('href');
+	await related.first().click({ force: true });
+	await expect(page).toHaveURL(new RegExp(`${href}$`));
+	await expect(page.locator('h1')).toBeVisible();
+	await expect(page.locator('h1')).not.toBeEmpty();
+});
+
+test('detail page does not request ~orig images at desktop size', async ({ page }) => {
+	const requested: string[] = [];
+	page.on('request', (req) => requested.push(req.url()));
+	await page.setViewportSize({ width: 1280, height: 800 });
+	await page.goto(DETAIL);
+	await expect(page.locator('main img').first()).toBeAttached();
+	await page.waitForLoadState('networkidle');
+	expect(requested.filter((u) => u.includes('~orig'))).toEqual([]);
+});
+
+test('detail page main image renders on a phone', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto(DETAIL);
+	const img = page.locator('main picture img').first();
+	await expect(img).toBeAttached();
+	await expect
+		.poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth))
+		.toBeGreaterThan(0);
+});
+
+test('home gallery lazy-loads appropriately sized images', async ({ page }) => {
+	const requested: string[] = [];
+	page.on('request', (req) => requested.push(req.url()));
+	await page.setViewportSize({ width: 1280, height: 800 });
 	await page.goto('/');
-	await expect(imageLinks(page).first()).toBeAttached();
-	const [start, other] = await hrefs(page);
+	const images = page.locator('main img');
+	await expect(images.first()).toBeAttached();
+	await page.waitForLoadState('networkidle');
 
-	// The related gallery queries NASA from the browser using every keyword of the
-	// image, which frequently returns nothing. Stub that one client-side request so
-	// the gallery deterministically links to a real image found on the home page.
-	const otherId = other!.replace('/image/', '');
-	await page.route('https://images-api.nasa.gov/search*', (route) =>
-		route.fulfill({
-			json: {
-				collection: {
-					items: [
-						{
-							data: [{ nasa_id: otherId, title: 'Related', description: 'Related' }],
-							links: [{ href: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' }]
-						}
-					]
-				}
-			}
-		})
+	const loading = await images.evaluateAll((els) => els.map((el) => el.getAttribute('loading')));
+	expect(loading.length).toBeGreaterThan(0);
+	expect(loading.every((l) => l === 'lazy')).toBe(true);
+	expect(requested.filter((u) => u.includes('~orig') || u.includes('~large'))).toEqual([]);
+
+	const current = await images.evaluateAll((els) =>
+		(els as HTMLImageElement[]).filter((el) => el.currentSrc).map((el) => el.currentSrc)
 	);
+	expect(current.length).toBeGreaterThan(0);
+	expect(current.every((u) => /~(small|medium)\./.test(u))).toBe(true);
+});
 
-	await page.goto(start!);
-	await expect(page.locator('h1')).toBeVisible();
-	const startTitle = await page.locator('h1').innerText();
-	const related = page.locator(`section a[href="${other}"]`);
-	await expect(related).toBeAttached();
-	await related.click({ force: true });
-
-	await expect(page).toHaveURL(new RegExp(`${other}$`));
-	await expect(page.locator('h1')).toBeVisible();
-	await expect(page.locator('h1')).not.toHaveText(startTitle);
+test('unknown image id returns 404 and shows the error page', async ({ page }) => {
+	const response = await page.goto('/image/doesnotexist123');
+	expect(response?.status()).toBe(404);
+	await expect(page.getByText('Image not found')).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Back to home' })).toBeVisible();
 });
 
 test('Inter and DM Mono web fonts load', async ({ page }) => {

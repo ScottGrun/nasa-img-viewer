@@ -35,6 +35,9 @@ export interface Link {
 	href: string;
 	rel: string;
 	render?: MediaType;
+	width?: number;
+	height?: number;
+	size?: number;
 	prompt?: string;
 }
 

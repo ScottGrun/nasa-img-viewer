@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { twMerge } from 'tailwind-merge';
-	import MasonaryImage, { type MasonaryImageProps } from './MasonaryImage.svelte';
+	import type { GalleryImage } from '#lib/images.js';
+	import MasonaryImage from './MasonaryImage.svelte';
 
 	interface Props {
-		images: MasonaryImageProps[];
+		images: GalleryImage[];
 		class?: string;
 	}
 

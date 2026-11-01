@@ -93,8 +93,5 @@
 			</div>
 		</div>
 	</main>
-	<!-- The gallery fetches on mount, so remount it when the displayed image changes -->
-	{#key metadata['AVAIL:NASAID']}
-		<RelatedImageGallery {keywords} parentImageId={metadata['AVAIL:NASAID'] ?? ''} class="mt-6" />
-	{/key}
+	<RelatedImageGallery images={data.related} class="mt-6" />
 </div>

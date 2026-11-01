@@ -10,17 +10,7 @@
 
 	let { data }: Props = $props();
 
-	const images = $derived(
-		data.items.map((image) => {
-			const imageData = image.data[0];
-			return {
-				url: image.links[0].href, // this grabs the thumbnail from each image
-				description: imageData.description,
-				title: imageData.title,
-				nasaId: imageData.nasa_id
-			};
-		})
-	);
+	const images = $derived(data.images);
 
 	const categories = [
 		{
