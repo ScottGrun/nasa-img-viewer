@@ -2,7 +2,8 @@
 	import type { HTMLImgAttributes } from 'svelte/elements';
 	import { twMerge } from 'tailwind-merge';
 
-	interface Props extends HTMLImgAttributes {
+	interface Props extends Omit<HTMLImgAttributes, 'class'> {
+		class?: string;
 		images?: AssetManifestItem[];
 		aspectRatio?: number;
 	}

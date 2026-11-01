@@ -3,7 +3,8 @@
 	import { twMerge } from 'tailwind-merge';
 	import type { HTMLInputAttributes } from 'svelte/elements';
 
-	interface Props extends HTMLInputAttributes {
+	interface Props extends Omit<HTMLInputAttributes, 'class'> {
+		class?: string;
 		icon?: Snippet;
 	}
 
