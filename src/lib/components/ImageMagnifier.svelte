@@ -5,7 +5,7 @@
 		clampLens,
 		clampZoom,
 		DEFAULT_LENS,
-		defaultZoom,
+		DEFAULT_ZOOM,
 		minimapMarker,
 		minimapOrigin,
 		minimapSize,
@@ -46,6 +46,9 @@
 
 	type Spot = { x: number; y: number; clientX: number; clientY: number; w: number; h: number };
 
+	/** The glass's border; the image sits inside it, so its centre is `GLASS_BORDER` closer in. */
+	const GLASS_BORDER = 4;
+
 	const viewport = () => ({
 		w: document.documentElement.clientWidth,
 		h: document.documentElement.clientHeight
@@ -65,7 +68,7 @@
 	let spot = $state<Spot | null>(null);
 
 	const native = $derived(nativeZoom(sourceWidth, spot?.w));
-	const zoom = $derived(clampZoom(userZoom ?? defaultZoom(native), native));
+	const zoom = $derived(clampZoom(userZoom ?? DEFAULT_ZOOM, native));
 	const active = $derived(enabled && spot !== null);
 
 	const isMouse = (event: PointerEvent) =>
@@ -200,6 +203,7 @@
 {#if active && spot}
 	{@const diameter = clampLens(lens, viewport())}
 	{@const radius = diameter / 2}
+	{@const inner = radius - GLASS_BORDER}
 	{@const display = { w: spot.w, h: spot.h }}
 	{@const map = minimapSize(display)}
 	{@const marker = minimapMarker(spot, display, zoom, diameter, map)}
@@ -227,16 +231,16 @@
 	<div
 		aria-hidden="true"
 		data-testid="magnifier-glass"
-		class="pointer-events-none fixed top-0 left-0 z-50 overflow-hidden rounded-full border-4 border-white shadow-xl ring-1 ring-black/20"
-		style="background-color:{LIGHTBOX_BACKGROUND};width:{diameter}px;height:{diameter}px;transform:translate({spot.clientX -
+		class="pointer-events-none fixed top-0 left-0 z-50 overflow-hidden rounded-full border-white shadow-xl ring-1 ring-black/20"
+		style="border-width:{GLASS_BORDER}px;background-color:{LIGHTBOX_BACKGROUND};width:{diameter}px;height:{diameter}px;transform:translate({spot.clientX -
 			radius}px,{spot.clientY - radius}px)"
 	>
 		<img
 			{src}
 			alt=""
 			class="absolute top-0 left-0 max-w-none select-none"
-			style="width:{spot.w * zoom}px;height:{spot.h * zoom}px;transform:translate({radius -
-				spot.x * zoom}px,{radius - spot.y * zoom}px)"
+			style="width:{spot.w * zoom}px;height:{spot.h * zoom}px;transform:translate({inner -
+				spot.x * zoom}px,{inner - spot.y * zoom}px)"
 		/>
 		{#if loading}
 			<div

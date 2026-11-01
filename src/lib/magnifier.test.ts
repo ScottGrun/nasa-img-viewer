@@ -3,7 +3,8 @@ import {
 	clampLens,
 	clampZoom,
 	fitSize,
-	defaultZoom,
+	DEFAULT_ZOOM,
+	MIN_ZOOM,
 	maxZoom,
 	minimapMarker,
 	minimapOrigin,
@@ -23,11 +24,15 @@ describe('magnifier zoom', () => {
 		expect(nativeZoom(4000, 0)).toBeUndefined();
 	});
 
-	it('defaults to native, at least 2, else 3 when unknown', () => {
-		expect(defaultZoom(5)).toBe(5);
-		expect(defaultZoom(1.2)).toBe(2);
-		expect(defaultZoom(undefined)).toBe(3);
-		expect(defaultZoom(40)).toBe(16);
+	it('defaults to the lowest zoom and does not depend on the source size', () => {
+		expect(DEFAULT_ZOOM).toBe(MIN_ZOOM);
+		expect(DEFAULT_ZOOM).toBe(1.5);
+		expect(clampZoom(DEFAULT_ZOOM, undefined)).toBe(1.5);
+		expect(clampZoom(DEFAULT_ZOOM, 6.5)).toBe(1.5);
+		// Zooming in from the default reaches the existing maximum.
+		expect(wheelZoom(DEFAULT_ZOOM, -100000, 6.5)).toBe(13);
+		// Zooming out from the default cannot go lower.
+		expect(wheelZoom(DEFAULT_ZOOM, 100000, 6.5)).toBe(1.5);
 	});
 
 	it('bounds the range', () => {

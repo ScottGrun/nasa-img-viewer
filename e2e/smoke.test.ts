@@ -676,6 +676,39 @@ test.describe('image lightbox', () => {
 		expect(state).toEqual({ count: 3, before: 'paused', after: 'finished' });
 	});
 
+	test('the glass opens at the lowest zoom, which cannot go lower but can go higher', async ({
+		page
+	}) => {
+		test.setTimeout(90_000);
+		const requested: string[] = [];
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await load(page, requested);
+		await trigger(page).click();
+		await expect(dialog(page)).toBeVisible();
+		await settled(page);
+		const box = (await picture(page).boundingBox())!;
+		await page.mouse.move(box.x + box.width / 2 - 4, box.y + box.height / 2);
+		await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+		await expect(glass(page)).toBeVisible();
+		const innerWidth = () => glassImg(page).evaluate((el) => el.getBoundingClientRect().width);
+		// The original arriving does not change the zoom.
+		const w0 = await innerWidth();
+		expect(w0 / box.width).toBeCloseTo(1.5, 2);
+		await expect
+			.poll(() => glassImg(page).evaluate((el: HTMLImageElement) => el.currentSrc), {
+				timeout: 90_000
+			})
+			.toContain('~orig');
+		expect(await innerWidth()).toBeCloseTo(w0, 0);
+		// Wheeling out from the default stays at the minimum.
+		await page.mouse.wheel(0, 1000);
+		await page.waitForTimeout(150);
+		expect(await innerWidth()).toBeCloseTo(w0, 0);
+		// Wheeling in works.
+		await page.mouse.wheel(0, -400);
+		await expect.poll(innerWidth).toBeGreaterThan(w0);
+	});
+
 	test('the glass background matches the lightbox backdrop', async ({ page }) => {
 		const requested: string[] = [];
 		await page.setViewportSize({ width: 1280, height: 800 });

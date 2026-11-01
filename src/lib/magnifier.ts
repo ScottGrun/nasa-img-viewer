@@ -1,7 +1,5 @@
 export const MIN_ZOOM = 1.5;
 export const ABSOLUTE_MAX_ZOOM = 16;
-const FALLBACK_ZOOM = 3;
-const MIN_DEFAULT_ZOOM = 2;
 const WHEEL_SENSITIVITY = 0.002;
 
 const positive = (value: number | undefined) =>
@@ -24,9 +22,8 @@ export const maxZoom = (native: number | undefined) =>
 export const clampZoom = (zoom: number, native: number | undefined) =>
 	Math.min(maxZoom(native), Math.max(MIN_ZOOM, zoom));
 
-/** Starting zoom: native 1:1 (at least 2), or 3 when the size is unknown. */
-export const defaultZoom = (native: number | undefined) =>
-	clampZoom(native === undefined ? FALLBACK_ZOOM : Math.max(MIN_DEFAULT_ZOOM, native), native);
+/** Starting zoom: fully zoomed out, so the glass opens at the lowest zoom. */
+export const DEFAULT_ZOOM = MIN_ZOOM;
 
 /** Multiplicative wheel zoom: scrolling up (negative deltaY) zooms in. */
 export const wheelZoom = (zoom: number, deltaY: number, native: number | undefined) =>
