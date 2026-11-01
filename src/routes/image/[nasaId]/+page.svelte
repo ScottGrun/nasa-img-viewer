@@ -98,5 +98,9 @@
 			</div>
 		</div>
 	</main>
-	<RelatedImageGallery images={data.related} class="mt-6" />
+	{#await data.related}
+		<p class="mt-6 text-sm text-neutral-600">Loading related images…</p>
+	{:then related}
+		<RelatedImageGallery images={related} class="mt-6" />
+	{/await}
 </div>

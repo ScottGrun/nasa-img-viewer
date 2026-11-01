@@ -1,11 +1,35 @@
 import { error } from '@sveltejs/kit';
 import { ASSET_TTL, METADATA_TTL, NasaError, RELATED_TTL, nasaJson } from '#lib/server/nasa.js';
-import { toGalleryImages, type GalleryImage } from '#lib/images.js';
+import { toGalleryImages, normalizeHref, type GalleryImage } from '#lib/images.js';
 import type { AssetManifestResponse, MetadataResponse, SearchResponse } from '#lib/types.js';
 import type { PageServerLoad } from './$types';
 
 const MAX_KEYWORDS = 20;
 const MAX_RELATED = 12;
+
+async function loadRelated(
+	keywords: string[],
+	nasaId: string,
+	options: { fetch: typeof fetch }
+): Promise<GalleryImage[]> {
+	if (keywords.length === 0) return [];
+	try {
+		const query = new URLSearchParams({
+			keywords: keywords.join(','),
+			media_type: 'image',
+			page_size: String(MAX_RELATED + 1)
+		});
+		const search = await nasaJson<SearchResponse>(`https://images-api.nasa.gov/search?${query}`, {
+			...options,
+			ttlSeconds: RELATED_TTL
+		});
+		return toGalleryImages(search.collection?.items)
+			.filter((image) => image.nasaId !== nasaId)
+			.slice(0, MAX_RELATED);
+	} catch {
+		return [];
+	}
+}
 
 export const load: PageServerLoad = async ({ params, fetch, setHeaders }) => {
 	const id = encodeURIComponent(params.nasaId);
@@ -33,30 +57,15 @@ export const load: PageServerLoad = async ({ params, fetch, setHeaders }) => {
 	}
 
 	const keywords = (metadata['AVAIL:Keywords'] ?? []).slice(0, MAX_KEYWORDS);
-	let related: GalleryImage[] = [];
-	if (keywords.length > 0) {
-		try {
-			const query = new URLSearchParams({
-				keywords: keywords.join(','),
-				media_type: 'image',
-				page_size: String(MAX_RELATED + 1)
-			});
-			const search = await nasaJson<SearchResponse>(`https://images-api.nasa.gov/search?${query}`, {
-				...options,
-				ttlSeconds: RELATED_TTL
-			});
-			related = toGalleryImages(search.collection?.items)
-				.filter((image) => image.nasaId !== params.nasaId)
-				.slice(0, MAX_RELATED);
-		} catch {
-			related = [];
-		}
-	}
+
+	// Not awaited, so the page renders without waiting for it and SvelteKit streams the result.
+	// Never rejects: an unhandled rejection could take down a Worker.
+	const related = loadRelated(keywords, params.nasaId, options);
 
 	setHeaders({ 'cache-control': 'public, max-age=3600, stale-while-revalidate=86400' });
 
 	return {
-		asset: { items: asset.collection.items.map(({ href }) => ({ href })) },
+		asset: { items: asset.collection.items.map(({ href }) => ({ href: normalizeHref(href) })) },
 		metadata: {
 			'AVAIL:Title': metadata['AVAIL:Title'],
 			'AVAIL:Description': metadata['AVAIL:Description'],

@@ -10,6 +10,13 @@ export interface GalleryImage {
 	srcset?: string;
 	width?: number;
 	height?: number;
+	/** Detail page image URLs, so they can be preloaded before navigating. */
+	preview: PreviewSources;
+}
+
+export interface PreviewSources {
+	large?: string;
+	medium?: string;
 }
 
 const SIZE_PATTERN = /~(thumb|small|medium|large|orig)\.[a-z0-9]+(?:[?#].*)?$/i;
@@ -30,6 +37,22 @@ export const pickBySize = (hrefs: string[], order: ImageSize[]): string | undefi
 	}
 	return usable.find((href) => sizeOf(href) === 'orig') ?? usable.find((href) => !sizeOf(href));
 };
+
+/**
+ * Detail page image URLs: `large` on wide screens, `medium` otherwise.
+ * Shared by the detail page's `<picture>` and the hover preload, so they always agree.
+ */
+export const pickPreviewSources = (hrefs: string[]): PreviewSources => ({
+	large: pickBySize(hrefs, ['large', 'medium', 'small', 'thumb']),
+	medium: pickBySize(hrefs, ['medium', 'large', 'small', 'thumb'])
+});
+
+/**
+ * NASA's asset API returns http:// URLs while search returns https://; normalize so caches match.
+ * Spaces are encoded because they would split a srcset candidate in two.
+ */
+export const normalizeHref = (href: string) =>
+	href.replace(/^http:\/\//i, 'https://').replaceAll(' ', '%20');
 
 const MAX_DESCRIPTION = 240;
 
@@ -74,6 +97,7 @@ export const toGalleryImage = (item: SearchResultItem): GalleryImage | undefined
 		nasaId: data.nasa_id,
 		title: data.title ?? '',
 		description: truncate(data.description ?? ''),
+		preview: pickPreviewSources(links.map((link) => normalizeHref(link.href))),
 		src: chosen.href,
 		srcset,
 		...(width && height ? { width, height } : {})

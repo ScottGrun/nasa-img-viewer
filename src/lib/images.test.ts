@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickBySize, toGalleryImage } from './images.js';
+import { normalizeHref, pickBySize, pickPreviewSources, toGalleryImage } from './images.js';
 import type { Link, SearchResultItem } from './types.js';
 
 const base = 'https://images-assets.nasa.gov/image/ID';
@@ -82,5 +82,21 @@ describe('pickBySize', () => {
 		const hrefs = [`${base}/ID~orig.jpg`, `${base}/ID~large.tif`, `${base}/ID~medium.jpg`];
 		expect(pickBySize(hrefs, ['large', 'medium'])).toBe(`${base}/ID~medium.jpg`);
 		expect(pickBySize([hrefs[0]], ['large', 'medium'])).toBe(hrefs[0]);
+	});
+});
+
+describe('normalizeHref', () => {
+	it('upgrades http to https and encodes spaces', () => {
+		expect(normalizeHref('http://images-assets.nasa.gov/image/A B/A B~large.jpg')).toBe(
+			'https://images-assets.nasa.gov/image/A%20B/A%20B~large.jpg'
+		);
+	});
+});
+
+describe('pickPreviewSources', () => {
+	it('prefers large/medium by device and never picks orig when something else exists', () => {
+		const hrefs = [link('orig', {}, 'png'), link('medium'), link('thumb')].map((l) => l.href);
+		expect(pickPreviewSources(hrefs)).toEqual({ large: hrefs[1], medium: hrefs[1] });
+		expect(pickPreviewSources([hrefs[0]])).toEqual({ large: hrefs[0], medium: hrefs[0] });
 	});
 });
