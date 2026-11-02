@@ -1,38 +1,48 @@
-# create-svelte
+# NASA Image Viewer
 
-Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/main/packages/create-svelte).
+A fun side project to make exploring the [NASA Image and Video Library](https://images.nasa.gov) a bit easier. The archive is enormous and wonderful, but hard to wander through. This app puts it in a fast, browsable masonry gallery so you can follow your curiosity from one image to the next.
 
-## Creating a project
+![NASA Image Viewer home page](docs/screenshot.png)
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Features
 
-```bash
-# create a new project in the current directory
-npx sv create
+- **Search and browse** the NASA archive from a masonry gallery, with quick category pills (Apollo 11, Wind Tunnel, Rovers, and more) to jump straight into a topic.
+- **Magnifying glass** for looking at small details. Open an image in the lightbox, turn on the glass, scroll to zoom and Ctrl + scroll to resize the lens. A minimap shows where you are in the image.
+- **Related image gallery** built from the keywords each image contains, so you can keep exploring from whatever you are looking at.
+- **Infinite scrolling** so results keep loading as you go. No pagination buttons.
 
-# create a new project in my-app
-npx sv create my-app
-```
+## Tech stack
 
-## Developing
+- [SvelteKit](https://svelte.dev/docs/kit) and Svelte 5
+- [Tailwind CSS](https://tailwindcss.com) v4
+- TypeScript
+- Deployed on Cloudflare (`adapter-cloudflare`), with NASA responses cached at the edge
+- Tested with [Vitest](https://vitest.dev) and [Playwright](https://playwright.dev)
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+Data comes from the public [NASA Image and Video Library API](https://images.nasa.gov/docs/images.nasa.gov_api_docs.pdf), which does not need an API key.
 
-```bash
-npm run dev
+## Getting started
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
+You need Node 22.17 or newer and [pnpm](https://pnpm.io).
 
 ```bash
-npm run build
+pnpm install
+pnpm dev
 ```
 
-You can preview the production build with `npm run preview`.
+Then open the URL that Vite prints (usually http://localhost:5173).
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+### Other scripts
+
+| Command          | What it does                 |
+| ---------------- | ---------------------------- |
+| `pnpm build`     | Production build             |
+| `pnpm preview`   | Preview the production build |
+| `pnpm check`     | Type-check with svelte-check |
+| `pnpm lint`      | Prettier and ESLint          |
+| `pnpm test:unit` | Unit tests                   |
+| `pnpm test:e2e`  | End-to-end tests             |
+
+## Credits
+
+All imagery belongs to NASA and is provided through the NASA Image and Video Library. This is an unofficial fan project and is not affiliated with or endorsed by NASA.
