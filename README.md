@@ -2,6 +2,8 @@
 
 A fun side project to make exploring the [NASA Image and Video Library](https://images.nasa.gov) a bit easier. The archive is enormous and wonderful, but hard to wander through. This app puts it in a fast, browsable masonry gallery so you can follow your curiosity from one image to the next.
 
+**Live demo: https://nasa-img-viewer.pages.dev/**
+
 ![NASA Image Viewer home page](docs/screenshot-gemini.png)
 
 ## Features
